@@ -1,0 +1,9 @@
+<ruby>
+	# to modify this script for your OS & shell do the following
+	# enter %x{clear} in irb, put the resulting string below
+	# If you're running msf in Cygwin, in Windows, make sure to run
+	# the irb command in Cygwin (untested)
+	# Tested on BT5r1, with BASH
+	
+	$stdout.print "\e[H\e[2J"
+</ruby>
