@@ -1,0 +1,58 @@
+Pentesters, admins, and IT folk are increasingly asked to do more with
+less. There's not enough hours in the day to spend gathering security-related data, analyzing it, reacting to changes, etc. So how to compete?  This talk will present novel techniques to address this problem, by presenting easy-to-implement systems which can automate your workflow. A number of demos will be given: 
+
+ * rbIPS - Monitoring your systems in novel ways (using ruby, audio, and jabber) for attacks and auto-attacking with metasploit
+  - audiomon
+  - jablog
+  - log
+  
+ * metaBot - a ruby tool to give you a command an control channel into a system.
+ 
+ * Porcupine - Integrate Metasploit to react to attacks as they're detected on your systems.
+ 
+ * The Lab (a metasploit component which does VM automation for you)
+ 
+ * Metacuke - A  slick DSL to write automated tests using Metasploit as an engine for testing.
+ 
+ 
+
+Continuous Network Testing with Metasploit: How do we get there? Idea worth spreading
+
+What should you test? Answer: everything, all the time
+Response: It's not practical
+Answer: yes it is. Using open source tools
+
+ - How to alert on a database change 
+
+
+Reconaissance:
+ - Auto-configuration of google alerts
+ - EAR (needs a ton of work)
+  - Google scrape for emails
+  - 
+  - DNS Lookups
+  - Metasploit Modules?
+  
+Discovery: 
+ - Etherpeep
+ - Nmap
+ - How to schedule this? (pbnj-type functionality)
+ 
+Attack & Post: (automating attack as new hosts pop up)
+ - Automatic attack-back
+ - Automatic blocking of malicious hosts - how to hook it all together?
+ 
+ 
+Reporting / Alerting: 
+
+
+
+You know /how/ to do this stuff, let's just make it easier.
+
+This talk consists of a number of mini-projects designed to help pentesters and hackers get stuff done:
+ * MetaRecon / EAR - Tools in metasploit to perform pentesting recon
+ * The Lab - a metasploit component which does VM automation for you
+ * RBot - a ruby tool to give you a command an control channel into a system
+ * Porcupine  -  Integrate Metasploit to react to attacks as they're detected on your systems.
+ * Cucumber vs Metasploit - A /very/ slick DSL to write automated tests using Metasploit as an engine for testing.
+ * Doppleganger - 
