@@ -1,0 +1,162 @@
+80 hours combined
+ 
+Basic Prereqs:
+ 
+ * ERB Rc file [2]
+ * RC Generator - erb, long-term website/service -KS
+ * Scheduling inside the console [2]
+ * RC bindings/variables [1]
+ * alerting (plugin?) -- via twitter [3]
+ * SESSIONS rather than SESSION [10]
+ 
+ 
+1) Automating/modeling an attacker, make metasploit mimic this kind of attacker, go.  -KS
+     - This can play into testing & training devices & people
+     - I can probably work some of this on billable time
+     - Automate an attack/attacker sequence/characteristic
+     - Mimic/emulate/simulate different types of attacks/attackers
+ 
+2) Creating and Automating a test lab [18] - jcran
+    Fog shit to work  [5]
+        Specify credentials, start an amazon box
+        plugin work to make as usable as possible [10]
+             - configure firewall
+            -  configure ssh login to the box
+    methods to generate sessions for additional testing [3]
+ 
+3) Defender & User Training -KS
+ 
+As a it guy, i want phish my users to train them not to click on shit.
+ ** Requries a http server module that can host a warning message
+ ** Requires a module to send emails 
+ ** Requires an smtp module / server
+ 
+As a it guy, i want to train my defenders how to recognize an attack
+ ** possibly requires scheduling
+ ** requires aherence to a strict schedule
+ 
+ ** sample RC scripts for 
+ *** exfiltration
+ *** exploit attempts
+ *** phishing attempts 
+ *** vishing attacks 
+ 
+4) Security Device Testing (vsploit) [??] -KS
+ 
+As technical buyer or recommender, I want to test an IPS for volume, ability to catch common exploit attempts, and other xxx
+ 
+tutorials? - rc files - hey what should i look for, and how do i practically do it
+ 
+4b) Traffic Generation [10] -KS
+4Force internet explorer to go to a particular location (post module?)
+ 
+5) (Constant) Internal discovery and enumeration [40] - KS [40] - jcran
+Discovery my own environment, does it match any expectations?
+Compliance?
+Reoccurring RC?  Alerting definitely has to be implemented by jcran
+Some might be alert per instance run, e.g. No non-windows hosts
+Some might be a background job on the db
+Constant internal wtf in the db?
+Provider/consumer, register auto-hooks in mods in init adds to provider, consumer is the auto-manger, PoC
+ 
+ * how to rerun an RC file, of infinite loop 
+ <ruby>
+     Do {ATTACKER_STEP1}
+    WAIT {ATTACKER_DELAY}
+      run_single "resource #{__FILE__}"
+    
+</ruby>
+ 
+would be neat to have a dashboard, 
+ 
+more detail needed
+ 
+6) APT Detection / Host Anomaly detection [20] - KS
+ 
+As an admin, i want to look for differences between host's registry, simpleist case is dump the registry then diff, lib
+ 
+7) Devops testing for regressions in network [15] -jcran
+ 
+Feature: Fingerprint my systems
+    In order to fingerprint systems on my network 
+    As an adminstrator
+    I want to fingerprint my systems via ssh, postgres, and smb
+ 
+Feature: Default Password Check
+        In order to avoid default passwords on my systems
+        As an administrator
+        I want to check systems for default accounts via SSH, FTP and RDP
+ 
+Scenario: Check Default Logins on Production Systems
+        Given I have a list of production systems
+        And a list of default account names
+        And a list of default passwords
+        When I check for each combination on the production systems via ssh
+        And i check ... via ftp
+        and i check .. via rdp 
+        Then I should have zero valid logins
+ 
+ 
+8) IRC command and control [10] -jcran
+finish bot plugins (nexpose, msf, pro, redmine)
+ 
+9) DOS Testing: (4-8 hours) -jcran
+ 
+integrate 
+ 
+11) Pentesting - joint?  Doobie. [5]
+    phish or ms08_067 / ms10_061 + evasion ->  erb for the email/phish
+    escalate (how to escalate on windows 7?)
+    dump hashes ->
+    pass the hash -> 
+    escalation / token hunting with jabra's modules
+    post_exploitation looting
+    pivoting
+    repeat
+ 
+ 
+ 
+X) Network Anomaly detection
+ 
+As a user, i want to be able to query differences between machines
+ 
+Db_fun searching & making sets
+ 
+X) External discovery and enumeration
+ 
+what would you look at? dns? pastebin? google alerts?
+ 
+1) Automating Security Devices
+ 
+As a network admin, i want to drive my vulnerability scanner
+ 
+3) Test Network Devices? 
+ 
+X) Network Research
+ 
+X) Host anomaly detection
+ 
+As an admin, i want to see if a particular issue is in the event log
+ 
+X) Monitoring
+ 
+Port scanning without sending a packet - https://media.defcon.org/dc-19/presentations/Pickett/DEFCON-19-Pickett-Port-Scanning-Without-Packets.pdf
+Sniffing via sessions
+ 
+X) Incident Detection & Response
+ 
+* Log in and look for anomalies 
+ 
+X) Forensics
+ 
+* Would require an automated analysis of some sort
+ 
+X) Automated Vuln Verification?
+ 
+X) Automated Patch Verification?
+ 
+X) Wireless
+ 
+X) Web
+ 
+X) Monitoring??
