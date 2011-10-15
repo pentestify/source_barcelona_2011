@@ -1,0 +1,32 @@
+# automatically find and display windows-like hosts
+
+#Using nmap
+# find a way to do provide status? run_single("print_status \"Using Nmap\"")
+
+<ruby>
+	run_single("db_nmap -O #{Rex::Socket.source_address("5.5.5.5")}/24")
+</ruby>
+
+# Using smb_version
+use auxiliary/scanner/smb/smb_version
+
+<ruby>
+	run_single("set RHOSTS #{Rex::Socket.source_address("5.5.5.5")}/24")
+</ruby>
+set THREADS 50
+run
+
+# Show only Windows'ish hosts 
+#hosts -c address,os_name,os_flavor,os_sp
+<ruby>
+	print_good "Showing Windows Hosts Only (CSV format)"
+	#run_single("hosts -c address,os_name,os_flavor,os_sp")
+	#.split(/\n/).each {|line| print_status line if line =~ /windows/i}
+	a = ["address","os_name","os_flavor","os_sp"]
+	print_line a.join(',')
+	win_hosts = framework.db.workspace.hosts.all(:order => :address).select { |dbhost| dbhost[:os_name] =~ /windows/i }
+	win_hosts.each do |wh|
+		print_line [wh.address,wh.os_name,wh.os_flavor,wh.os_sp].join(',')
+			#k.to_s =~ /[os_|address]/
+	end
+</ruby>

@@ -1,0 +1,14 @@
+# Show only Windows'ish hosts, but for now just show all OSs
+#hosts -c address,os_name,os_flavor,os_sp
+<ruby>
+	print_good "Showing Windows Hosts Only (CSV format)"
+	#run_single("hosts -c address,os_name,os_flavor,os_sp")
+	#.split(/\n/).each {|line| print_status line if line =~ /windows/i}
+	a = ["address","os_name","os_flavor","os_sp"]
+	print_line a.join(',')
+	win_hosts = framework.db.workspace.hosts.all(:order => :address).select { |dbhost| dbhost[:os_name] =~ /windows/i }
+	win_hosts.each do |wh|
+		print_line [wh.address,wh.os_name,wh.os_flavor,wh.os_sp].join(',')
+			#k.to_s =~ /[os_|address]/
+	end
+</ruby>

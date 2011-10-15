@@ -1,0 +1,10 @@
+<ruby>
+	print_good "Starting"
+	print_status "w/o assigning to var"
+	print_status [:address,:os_name,:os_flavor,:os_sp,:os_lang].join(',')
+
+	print_status "with assigning to a var"
+	cols = []
+	cols = [:address,:os_name,:os_flavor,:os_sp,:os_lang]
+	print_status = cols.join(',')
+</ruby>
