@@ -1,0 +1,1 @@
+1)  Scope in RC file isn't totally lost across runs of an RC file, so at a minimum, constants are retained, causing 'warning: already initialized constant'.  A good solution it to create a module namespace in your RC so anything defined will fall out of scope when the module ends

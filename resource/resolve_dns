@@ -1,6 +1,68 @@
 # automatically resolve DNS
 
 <ruby>
-#	Socket.do_not_reverse_lookup = false
-	print_good Rex::Socket.gethostbyname('192.168.1.1')
+
+require 'socket'
+require 'timeout'
+require 'ipaddr'
+require 'logger'
+require 'net/dns/packet'
+require 'net/dns/resolver/timeouts'
+
+module RcFile
+
+	#Socket.do_not_reverse_lookup = false;print_good Rex::Socket.gethostbyname('192.168.1.1')
+
+	RC_LOG_FILE = $stdout
+	RC_SEARCHLIST = ["mydoman.com","internal.mydomain.com"]
+	RC_NAMESERVERS = [IPAddr.new("192.168.1.1")]
+	RC_SOURCE_INTERFACE = IPAddr.new("0.0.0.0")
+	RC_RETRY_INTERVAL = 1
+	RC_RETRY_NUMBER = 1
+
+	@resolver = Net::DNS::Resolver.new( {
+	        :log_file => RC_LOG_FILE,
+	        :searchlist => RC_SEARCHLIST,
+	        :nameservers => RC_NAMESERVERS,
+	        :source_address => RC_SOURCE_INTERFACE,
+	        :retry_interval => RC_RETRY_INTERVAL,
+	        :retry_number => RC_RETRY_NUMBER,
+	} )
+	
+	def self.run_lookup(ip)
+		#search(name,type=Net::DNS::A,cls=Net::DNS::IN)
+		query = @resolver.search("#{ip}",Net::DNS::PTR)
+	end
+	
+	def self.format_output(record)
+		#print_good("Lookup: #{ip}  Hostname: #{record.ptr} Record: #{rr.class}")
+		#print_good("IP Address: #{rr.address}") if rr.class == Net::DNS::RR::A
+		return "#{record.name},#{record.ptr}"
+	end
+end # end module
+
+t1 = Time.new
+print_good "Start time:  #{t1}"
+255.times do |oct4|
+	ip = "192.168.1.#{oct4}"
+	query = RcFile.run_lookup(ip)
+	if query
+		#report_note(hash) if rr.class == Net::DNS::RR::A
+		query.answer.each do |rr|
+			print_line(RcFile.format_output(rr))
+			report_note(	:host => rr.address.to_s,
+							:proto => 'udp',
+							:sname => 'DNS',
+							:port => 53,
+							:type => 'DNS_LOOKUP',
+							:data => "#{rr.address.to_s},#{ip},A"
+						) if false
+		end
+	else
+	print_status("No Response")
+	end
+end
+t2 = Time.new
+print_good "End time:  #{t2}"
+print_good "Time delta:  #{t2-t1}"
 </ruby>
