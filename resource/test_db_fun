@@ -1,0 +1,3 @@
+load db_fun
+db_search hosts
+db_set_run_module "scanner/smb/smb_version"
