@@ -1,3 +1,33 @@
 load db_fun
 db_search hosts
 db_set_run_module "scanner/smb/smb_version"
+
+#		module_name = 'scanner/ssh/ssh_login'
+#		payload_name = 'linux/x86/meterpreter/bind_tcp'
+#		options = {     "RHOSTS"                => @item.address,
+#						"USERNAME"              => @user,
+#						"PASSWORD"              => @pass,
+#						"BLANK_PASSWORDS"       => false,
+#						"USER_AS_PASS"          => false,
+#						"VERBOSE"               => false}
+#		aux = @framework.auxiliary.create(module_name)
+
+        # Report a Note to the database.  Notes can be tied to a Workspace, Host, or Service.
+        #
+        # opts MUST contain
+        # +:data+::  whatever it is you're making a note of
+        # +:type+::  The type of note, e.g. smb_peer_os
+        #
+        # opts can contain
+        # +:workspace+::  the workspace to associate with this Note
+        # +:host+::       an IP address or a Host object to associate with this Note
+        # +:service+::    a Service object to associate with this Note
+        # +:port+::       along with :host and proto, a service to associate with this Note
+        # +:proto+::      along with :host and port, a service to associate with this Note
+        # +:update+::     what to do in case a similar Note exists, see below
+        #
+        # The +:update+ option can have the following values:
+        # +:unique+::       allow only a single Note per +:host+/+:type+ pair
+        # +:unique_data+::  like +:uniqe+, but also compare +:data+
+        # +:insert+::       always insert a new Note even if one with identical values exists
+

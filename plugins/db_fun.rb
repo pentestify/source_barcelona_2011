@@ -250,7 +250,7 @@ class Plugin::DbFun < Msf::Plugin
 
 				print_good("DEBUG:  Module args: #{mod_args[:module]} #{mod_args[:payload]}, " +
 							"and options: #{mod_opts.to_s}") if @debug
-				self.run_module(@framwork,mod_args,mod_opts)
+				self.run_module(mod_args,mod_opts,@framework)
 			else 
 				print_error "Set some options chief!"
 				return fun_usage
@@ -293,29 +293,34 @@ class Plugin::DbFun < Msf::Plugin
 		protected
 		# This method actually runs a module against a set, meant to be called by db_set_run_module etc
 		
-		def run_module(framework,args={},opts={}) #use *args instead?
-			# possible args - :framework :set :module :payload
+		def run_module(args={},opts={},framework=nil) #use *args instead?
+			# possible args - :set :module :payload
 			# possible opts - :rhost :lhost :lport :rport etc
 			#print_good "DEBUG:  The set is #{args[:set].to_s}" if @debug
 			# TODO:  Strip off any leading "auxiliary" or "exploit" from args[:module]
+			# TODO:  Merge in some good default option settings like VERBOSE => false etc
+			
+			#create a framework instance if need be
+			framework = Msf::Simple::Framework.create unless framework
+			raise("Unable to instantiate the framework.  ") unless framework
+			# for now, let's just do an aux
+			aux = framework.auxiliary.create(args[:module]) # move outside each loop?
+			unless aux
+				raise ("Unable to create module instance, framework instance was #{framework}")
+				framework.cleanup
+			end
 			print_good "DEBUG:  Number of items in the set = #{args[:set].count}" if @debug
 			if args[:set].count > 0
 				args[:set].each do |item| 
 					if item.class == Msf::DBManager::Host
 						print_good "Running module #{args[:module]} against #{item.address}"
 						#`
-						# Do it like a boss
+						# Do it like a boss d-_-b
 						#
-						
-						#create a framework instance if need be
-						@framework = Msf::Simple::Framework.create unless @framework
-
-						# for now, let's just do an aux
-						aux = @framework.auxiliary.create(args[:module]) # move outside each loop?
-						raise ("Unable to create module instance, framework instance was" +
-							" #{@framework}") unless aux
+						# ¯\_(ツ)_/¯
+						# ♪└(・。・)┐♫
 						# it's probably a good idea to consolidate RHOSTS at some point
-						#  to avoid calling certain module repeatedly for each ip, instead of once
+						#  to avoid calling the same module repeatedly for each ip, instead of once
 						# for now let's just keep it simple
 						opts[:RHOSTS.to_s] = item.address
 						# for exploit:  opts[:RHOST] = item.address.to_s
@@ -325,13 +330,36 @@ class Plugin::DbFun < Msf::Plugin
 							# TODO:  Validate options for the particular module, jcran??
 							# Fire it off.
 							aux.run_simple(
-								#'Payload'     => args[:payload],
-								'Options'     => opts,
-								'LocalInput'    => Rex::Ui::Text::Input::Buffer.new,
-								'LocalOutput'   => Rex::Ui::Text::Output::Buffer.new
+								'Payload'     => args[:payload],
+								'Options'		=> opts,
+								'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
+								'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
+								# Is there a way to make output be the console?
+								#'RunAsJob'		=> true
 								)
+							# TODO:  check if most aux/post mods write to the db, otherwise report
+							# aux.report_note({
+							#				:data => "required" #whatever it is you're making a note of
+							#				:type => "required" # type of note, e.g. smb_peer_os
+							# 				:workspace => "optional" # workspace to associate w/note
+							#				:host => item.address #IP address or Host obj to assoc.
+							#				:service => "optional" #Service object to assoc.
+							#				:port =>	"optional" #along with :host and proto, a
+										# service to associate with this Note
+							#				:proto => "optional" along with :host and port, a 
+										# service to associate with this Note
+							#				:update => what to do in case a similar Note exists
+										# The +:update+ option can have the following values:
+											#unique+::allow only a single Note per +:host+/+:type+ pair
+											#:unique_data+::like +:uniqe+, but also compare +:data+
+											#:insert+::always insert a new Note regardless
+							#				})
+
+
+
 						rescue Exception => e
-							raise "Unable to run module #{args[:module]}, check required options\n#{e.backtrace}"
+							raise("Unable to run module #{args[:module]}, check required options\n" +
+							"#{e.backtrace}")
 						end
 					else 
 						print_error "#{item.class} is not a host!"
