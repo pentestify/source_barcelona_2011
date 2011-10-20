@@ -1,1 +1,0 @@
-require 'rex/platforms/windows'
