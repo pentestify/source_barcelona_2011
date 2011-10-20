@@ -12,7 +12,7 @@ class Plugin::DbFun < Msf::Plugin
 			super(driver)
 			@working_set = []
 			@sets = {}
-			@debug = false
+			@debug = true
 		end
 
 		# TODO:  Turn a set into it's own class?  I guess it already has a class from DbManager?
@@ -218,14 +218,16 @@ class Plugin::DbFun < Msf::Plugin
 		end
 
 		def cmd_db_set_run_module(*args)
-			# [set_id] [module] [payload] [options(OPT=val format)]
+			# expects:  [set_id] [module] [payload] [options(OPT=val format)]
+			
+			@framework = Msf::Simple::Framework.create unless @framework
 			if args.count > 0
 				mod_args = {}
 				mod_opts = {}
 				mod_args[:set] = @working_set # default
-				if args[0].is_a?(Integer)
-					# if the first arg acts like an Integer, assume it's a set_id and resolve it
-					print_good "DEBUG:  #{args[0]} looks like an Integer" if @debug
+				if @sets.has_key?(args[0])
+					# if the first arg seems to be a key in @sets, assume it's a set_id and resolve it
+					print_good "DEBUG:  #{args[0]} looks like a set id" if @debug
 					begin
 						mod_args[:set] = @sets[args[0]] 
 						args.shift
@@ -236,21 +238,29 @@ class Plugin::DbFun < Msf::Plugin
 					end
 				end
 
-				mod_args[:module] = args[0] || "windows/smb/psexec"
-				args.shift
-				mod_args[:payload] = args[0] || "windows/meterpreter/bind_tcp"
-				args.shift # this doesn't throw an error if args is empty
-				# now process the remaining payload args if any left
+				if @framework.modules.include?(args[0])
+					# if this arg matches a known module, assume it's a module
+					mod_args[:module] = args[0]
+					args.shift # this doesn't throw an error if args is empty
+				end
+				
+				if @framework.payloads.include?(args[0])
+					# if this arg matches a known payload, assume it's a payload
+					mod_args[:payload] = args[0]
+					args.shift # this doesn't throw an error if args is empty
+				end
+				# now process the remaining args as options if any args remain
 				while args.count > 0
 					# be nice: allow '=' or '==' etc and let them put "=" in the value
 					opt,val, = args[0].split(/=+/,2) 
-					mod_opts[opt.upcase.to_sym] = val.downcase #downcase everything for now
+					mod_opts[opt.to_s.upcase] = val.downcase #downcase everything for now
+					# not using symbols above as it seems to break the framework
 					args.shift
 				end
 
 				print_good("DEBUG:  Module args: #{mod_args[:module]} #{mod_args[:payload]}, " +
 							"and options: #{mod_opts.to_s}") if @debug
-				self.run_module(mod_args,mod_opts,@framework)
+				self.run_module(@framework,mod_args,mod_opts)
 			else 
 				print_error "Set some options chief!"
 				return fun_usage
@@ -291,45 +301,57 @@ class Plugin::DbFun < Msf::Plugin
 		end
 		
 		protected
-		# This method actually runs a module against a set, meant to be called by db_set_run_module etc
 		
-		def run_module(args={},opts={},framework=nil) #use *args instead?
+		#
+		# This method actually runs a module against a set, meant to be called by db_set_run_module etc
+		#
+		def run_module(framework=nil,args={},opts={})
 			# possible args - :set :module :payload
 			# possible opts - :rhost :lhost :lport :rport etc
 			#print_good "DEBUG:  The set is #{args[:set].to_s}" if @debug
-			# TODO:  Strip off any leading "auxiliary" or "exploit" from args[:module]
 			# TODO:  Merge in some good default option settings like VERBOSE => false etc
-			
+			print_good "Running module with framework:#{framework} args:#{args} opts:#{opts}" if @debug
+			if (args.class != Hash or args.empty?)
+				raise ArgumentError.new ("Expected:  framework=nil, args={}, and optionally opts={}")
+			end
+			# make sure all keys in opts are strings and not symbols, symbols seem to break
+			opts.each_key do |k|
+				# TODO:  convert to string or raise error if symbol?
+			end
 			#create a framework instance if need be
 			framework = Msf::Simple::Framework.create unless framework
 			raise("Unable to instantiate the framework.  ") unless framework
-			# for now, let's just do an aux
-			aux = framework.auxiliary.create(args[:module]) # move outside each loop?
-			unless aux
+			#check if leading aux, post, exploit, modules
+			# remove any leading slashes and any leading words like auxiliary or post etc
+			modjool = args[:module].downcase
+			modjool.gsub!(/^[\\\/]+/,'') # this is supposed to get rid of leading slashes
+			print_good "modjool with leading slashes stripped: #{modjool}" if @debug
+			modjool.gsub!(/^auxiliary|^encoders|^exploits|^nops|^payloads|^post/,'')
+			print_good "modjool with leading module types stripped: #{modjool}" if @debug
+			inst = get_instance(framework,modjool)
+			unless inst
 				raise ("Unable to create module instance, framework instance was #{framework}")
-				framework.cleanup
+				#framework.cleanup
 			end
 			print_good "DEBUG:  Number of items in the set = #{args[:set].count}" if @debug
 			if args[:set].count > 0
 				args[:set].each do |item| 
 					if item.class == Msf::DBManager::Host
-						print_good "Running module #{args[:module]} against #{item.address}"
+						print_good "Running module #{modjool} against #{item.address}"
 						#`
 						# Do it like a boss d-_-b
 						#
-						# ¯\_(ツ)_/¯
-						# ♪└(・。・)┐♫
 						# it's probably a good idea to consolidate RHOSTS at some point
 						#  to avoid calling the same module repeatedly for each ip, instead of once
-						# for now let's just keep it simple
+						#  for now let's just keep it simple
 						opts[:RHOSTS.to_s] = item.address
 						# for exploit:  opts[:RHOST] = item.address.to_s
-						print_good("DEBUG:  Module args: #{args[:module]} #{args[:payload]}, " +
+						print_good("DEBUG:  Module args: #{modjool} #{args[:payload]}, " +
 							"and options: #{opts.to_s}") if @debug
 						begin 
 							# TODO:  Validate options for the particular module, jcran??
 							# Fire it off.
-							aux.run_simple(
+							inst.run_simple(
 								'Payload'     => args[:payload],
 								'Options'		=> opts,
 								'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
@@ -355,10 +377,8 @@ class Plugin::DbFun < Msf::Plugin
 											#:insert+::always insert a new Note regardless
 							#				})
 
-
-
 						rescue Exception => e
-							raise("Unable to run module #{args[:module]}, check required options\n" +
+							raise("Unable to run module #{modjool}, check required options\n" +
 							"#{e.backtrace}")
 						end
 					else 
@@ -369,6 +389,32 @@ class Plugin::DbFun < Msf::Plugin
 				print_error "Nothing in the set!" 
 			end
 		end
+		
+		def get_instance(framework,modjool)
+			possible = ["auxiliary","encoders","exploits","nops","payloads","post"]
+			unsupported = ["encoders","nops"]
+			nonsense = ["payload"]
+			ret = nil
+			possible.each do |type|
+				if framework.send(type).include?(modjool)
+					# then this modjool is valid and of type type
+					if unsupported.include?(modjool)
+						# Then we don't support this
+						raise ArgumentError.new ("This type of module (#{modjool}) is not supported")
+					elsif nonsense.include?(modjool)
+						# Then this don't make no damn sense
+						raise ArgumentError.new ("It doesn't make sense to use #{modjool} as a module")
+					else
+						ret = framework.send(type).create(modjool)
+						break
+					end
+				else
+					# then this modjool isn't recognized as a valid module
+					raise ArgumentError.new ("#{modjool} is not a valid module")
+				end
+			end # end each
+			return ret
+		end # end method
 	
 		private
 		

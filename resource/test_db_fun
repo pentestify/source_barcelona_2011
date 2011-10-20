@@ -1,6 +1,6 @@
 load db_fun
 db_search hosts
-db_set_run_module "scanner/smb/smb_version"
+db_set_run_module "scanner/smb/smb_version" THREADS=2
 
 #		module_name = 'scanner/ssh/ssh_login'
 #		payload_name = 'linux/x86/meterpreter/bind_tcp'
