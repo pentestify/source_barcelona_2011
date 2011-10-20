@@ -1,0 +1,7 @@
+Metasploit: Hacker's Swiss Army Knife (Jonathan Cran, Rapid7 / Joshua Smith JHUAPL) Wednesday 14:30—15:20
+
+Metasploit is a well-known exploit development and pentesting framework, but its power is not limited. Taking a shotgun approach to the presentation, the speakers will show attendees how to tap metasploit to automate and model attacker actions, create and automate a test lab, perform network device (such as ips/ids) testing, schedule regular regression tests, train defenders, and generally how to bend metasploit to your will. Attendees are encouraged to bring a helmet, this is a demo- and code-heavy presentation!
+ 
+Jonathan Cran (jcran) is the Director of Quality Assurance and an engineer with the Rapid7 Metasploit team. He's consulted and performed technical security assessment and pentests across a wide range of verticals, including financial, utilities, and government. He maintains a blog at www.pentestify.com. Joshua Smith (kernelsmith) is a security engineer at the Johns Hopkins University Applied Physics Laboratory (JHUAPL) and an active member of the metasploit community. 
+
+
