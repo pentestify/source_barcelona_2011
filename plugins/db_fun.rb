@@ -15,6 +15,8 @@ class Plugin::DbFun < Msf::Plugin
 			@debug = true
 		end
 		
+		attr_accessor :debug
+		
 		# create instance method print_deb so we can turn it on and off w/o having to use lots of if stmts
 
 		#class Msf::Plugin
@@ -39,11 +41,12 @@ class Plugin::DbFun < Msf::Plugin
 			"db_set_list" => "List all sets",
 			"db_set_show" => "[id] - Show the set",
 			"db_set_create" => "[id] - Set this query as the current db working set.",
+			"db_set_auto" => "Automatically create some default sets like: windows,linux,all_hosts,etc",
 			"db_set_add_to" =>  "[id] - Add these items to the working set",
 			"db_set_del_from" => "[id] - Delete these items to the working set",	
-			"db_set_run_module" => "[id] module [payload] OPT=val - run modules against a set",
+			"db_set_run_module" => "[id] module [payload] [OPT=val] # run module against set",
 			"db_fun_show_examples" => "I'm confused, show me some examples",
-			"db_set_auto" => "Automatically create some default sets like: windows,linux,all_hosts,etc"
+			"db_fun_debug" => "db_fun_debug [true|false] # sets or displays debug setting",
 		}
 		end
 
@@ -79,7 +82,7 @@ class Plugin::DbFun < Msf::Plugin
 							"db_search services where proto=tcp" ],
 			"db_set_create" => "db_set_create 1  # creates db set with id 1 using latest query",
 			"db_set_add_to" =>  "db_set_add_to 1  # adds to db set 1 using latest query results",
-			"db_set_run_module" => "db_set_run_module 1 auxiliary/scanner/smb/smb_version"
+			"db_set_run_module" => "db_set_run_module 1 scanner/smb/smb_version # run mod against set 1",
 			}
 			#just do a simple display for now
 			print_good "db_fun command examples"
@@ -115,6 +118,20 @@ class Plugin::DbFun < Msf::Plugin
 			result_set = self.dbsearch(args)
 			hlp_print_set result_set, "Searched Set" #, class_name
 		end
+		
+		def cmd_db_fun_debug(bool=nil)
+			if bool =~ /^f/i # if it even starts with "f/F"
+				@debug = false
+			elsif bool =~ /^t/i
+				@debug = true
+				print_good "Debugging information will now be displayed"
+			elsif bool.nil?
+				print_good "Debug is set to #{@debug.to_s}"
+			else
+				print_error "I didn't recognize your argument, try true, false, or no arguments"
+			end
+			@debug
+		end
 
 		def cmd_db_set_run_module(*args)
 			# expects:  [set_id] [module] [payload] [options(OPT=val format)]
@@ -139,12 +156,12 @@ class Plugin::DbFun < Msf::Plugin
 				
 				modjool = self.normalize_module(args[0])
 				if fmwk.modules.include?(modjool)
-					print_deb "Module (#{modjool} is valid.)"
+					print_deb "Module (#{modjool}) is valid."
 					# if this arg matches a known module, assume it's a module
 					mod_args[:module] = modjool
 					args.shift # this doesn't throw an error if args is empty
 				else
-					raise ArgumentError.new ("The module (#{modjool} is not valid.)")
+					raise ArgumentError.new ("The module or set id (#{modjool}) is not valid.")
 				end
 				
 				if fmwk.payloads.include?(args[0])
@@ -163,8 +180,8 @@ class Plugin::DbFun < Msf::Plugin
 					args.shift
 				end
 
-				print_deb("Module args: #{mod_args[:module]} #{mod_args[:payload]}, " +
-							"and options: #{mod_opts.to_s}")
+				print_deb("Attemping to run: #{mod_args[:module]} #{mod_args[:payload]}, " +
+							"with options: #{mod_opts.to_s}")
 				self.run_module(fmwk,mod_args,mod_opts)
 			else 
 				print_error "Set some options chief!"
@@ -174,6 +191,7 @@ class Plugin::DbFun < Msf::Plugin
 
 		def cmd_db_set_create(*args)
 			#TODO:  Find a way to persist sets by serializing? them to .msf4 etc
+			#TODO:  Decide whether or not to be case sensitive and enforce it
 			return fun_usage unless args.count > 0	
 		
 			set_id = args[0]
@@ -192,6 +210,7 @@ class Plugin::DbFun < Msf::Plugin
 			self.create_set("linux", "hosts where os_name~linux")
 			self.create_set("all_hosts", "hosts")
 			#self.create_set("unknown","hosts where os_name=nil")
+			cmd_db_set_list
 		end
 		
 		# Merge the two sets
@@ -225,14 +244,15 @@ class Plugin::DbFun < Msf::Plugin
 		end
 		
 		def normalize_module(m)
+			raise ArgumentError.new "Could not normalize module, no module given" unless m
 			# TODO:  Improve this ghetto crap
 			# remove any leading slashes and any leading words like auxiliary or post etc
 			modjool = m.downcase
 			modjool.gsub!(/^[\\\/]+/,'') # this is supposed to get rid of leading slashes
-			print_deb "modjool with leading slashes stripped: #{modjool}"
+			#print_deb "modjool with leading slashes stripped: #{modjool}"
 			modjool.gsub!(/^auxiliary|^encoders|^exploit[s]*|^nops|^payloads|^post/,'')
 			modjool.gsub!(/^[\\\/]+/,'') # this is supposed to get rid of leading slashes
-			print_deb "modjool with leading module types stripped: #{modjool}"
+			#print_deb "modjool with leading module types stripped: #{modjool}"
 			return modjool
 		end
 		
@@ -244,7 +264,6 @@ class Plugin::DbFun < Msf::Plugin
 			# possible opts - :rhost :lhost :lport :rport etc
 			#print_deb "The set is #{args[:set].to_s}"
 			# TODO:  Merge in some good default option settings like VERBOSE => false etc
-			print_deb "Running module with framework:#{framework} args:#{args} opts:#{opts}"
 			if (args.class != Hash or args.empty?)
 				raise ArgumentError.new ("Expected:  framework=nil, args={}, and optionally opts={}")
 			end
@@ -257,116 +276,171 @@ class Plugin::DbFun < Msf::Plugin
 			raise("No framework object given and unable to instantiate a new framework.  ") unless framework
 			#check if leading aux, post, exploit, modules
 			# remove any leading slashes and any leading words like auxiliary or post etc
-			modjool = self.normalize_module(args[:module])
-			inst = get_instance(framework,modjool)
-			unless inst
-				raise ("Unable to create module instance, framework instance was #{framework}")
-				#framework.cleanup
+			args[:module] = self.normalize_module(args[:module])
+			# let's get an instance of the module
+			if framework.modules.include?(args[:module])
+				inst = framework.modules.create(args[:module])
+			else
+				raise ArgumentError.new ("#{args[:module]} is not a valid module")
 			end
+			it = inst.type
 			print_deb "Number of items in the set = #{args[:set].count}"
+			print_deb "Running #{it} module with framework:#{framework} args:#{args} opts:#{opts}"
+			
+			case it
+			when /auxiliary/
+				self.run_aux(inst,args,opts)
+			when /post/
+				print_error "post modules are not supported yet"
+				#self.run_post(inst,args,opts)
+			when /exploit/
+				self.run_exploit(inst,args,opts)
+			when /payload/
+				raise ArgumentError.new ("Can't have a payload as the module")
+			when /encoder|nop/
+				raise ArgumentError.new ("Not feasible to use a nop or encoder as the module")
+			else
+				print_deb "The module type (#{inst.type}) must be new cuz it's valid, but I don't recognize"
+			end
+						# TODO:  check if most aux/post mods write to the db, otherwise report
+						# aux.report_note({
+						#		:data => "required" #whatever it is you're making a note of
+						#		:type => "required" # type of note, e.g. smb_peer_os
+						# 		:workspace => "optional" # workspace to associate w/note
+						#		:host => item.address #IP address or Host obj to assoc.
+						#		:service => "optional" #Service object to assoc.
+						#		:port => "optional" along w/ :host & proto, a service to assoc w/ this Note
+						#		:proto => "optional" along w/ :host & port, a service to assoc w/ this Note
+						#		:update => what to do in case a similar Note exists
+								# The +:update+ option can have the following values:
+								#unique+::allow only a single Note per +:host+/+:type+ pair
+								#:unique_data+::like +:uniqe+, but also compare +:data+
+								#:insert+::always insert a new Note regardless
+						#				})
+
+
+		end
+		
+		def run_aux(inst, args={}, opts={})
+			# TODO:  Do we need validation of args this far down in the call stack?
 			if args[:set].count > 0
 				args[:set].each do |item| 
 					if item.class == Msf::DBManager::Host
-						print_good "Running module #{modjool} against #{item.address}"
+						print_good "Running #{inst.name} against #{item.address}"
 						#`
 						# Do it like a boss d-_-b
 						#
-						# it's probably a good idea to consolidate RHOSTS at some point
+						# TODO:  it's probably a good idea to consolidate RHOSTS at some point
 						#  to avoid calling the same module repeatedly for each ip, instead of once
 						#  for now let's just keep it simple
-						opts[:RHOSTS.to_s] = item.address
-						# for exploit:  opts[:RHOST] = item.address.to_s
-						print_deb("Module args: #{modjool} #{args[:payload]}, " +
-							"and options: #{opts.to_s}")
+						opts[:RHOSTS.to_s] = item.address # must use string as key, datastore cranky
 						begin
-							case inst.type
-							# TODO:  Validate options for the particular module
-							# Fire it off.
-								when /auxiliary/
-									print_deb "Input is: #{inst.user_input}, Output is: #{inst.user_output}"
-									inst.run_simple(
-									'Payload'     => args[:payload],
-									'Options'		=> opts,
-									'LocalInput'	=> inst.user_input,
-									'LocalOutput'	=> inst.user_output,
-									#'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
-									#'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
-									# Is there a way to make output be the console?
-									#'RunAsJob'		=> true
-									)
-								when /post/
-									# TODO:
-								when /exploit/
-									inst.exploit_simple(
+							# Move print_deb input and output to after run_simple?
+							print_deb "Input is: #{inst.user_input}, Output is: #{inst.user_output}"
+							inst.run_simple(
+								'Payload'     	=> args[:payload],
+								'Options'		=> opts,
+								'LocalInput'	=> inst.user_input,
+								'LocalOutput'	=> inst.user_output,
+								#'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
+								#'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
+								# Is there a way to make output be the console?
+								#'RunAsJob'		=> true
+											)
+						rescue Exception => e
+							raise ArgumentError.new("Unable to run #{args[:module]}, check " +
+							"required options\n" + "#{e.backtrace}")
+						end
+					else 
+						print_error "#{item.class} is not a host!"
+					end # end if
+				end # end each
+			else
+				print_error "Nothing in the set!" 
+			end # end if
+		end # end method
+		
+		def run_post(inst, args={}, opts={})
+			# TODO:  Do we need validation of args this far down in the call stack?
+			if args[:set].count > 0
+				args[:set].each do |item| 
+					if item.class == Msf::DBManager::Host # Need SESSIONS here, unless we
+													# correllate using ~ sessions -l -v
+						print_good "Running #{inst.name} against #{item.address}"
+						#`
+						# Do it like a boss d-_-b
+						#
+						# TODO:  it's probably a good idea to consolidate RHOSTS at some point
+						#  to avoid calling the same module repeatedly for each ip, instead of once
+						#  for now let's just keep it simple
+						opts[:RHOSTS.to_s] = item.address # must use string as key, datastore cranky
+						begin
+							print_deb "Input is: #{inst.user_input}, Output is: #{inst.user_output}"
+							inst.run_simple(
+								'Payload'     	=> args[:payload],
+								'Options'		=> opts,
+								'LocalInput'	=> inst.user_input,
+								'LocalOutput'	=> inst.user_output,
+								#'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
+								#'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
+								# Is there a way to make output be the console?
+								#'RunAsJob'		=> true
+											)
+						rescue Exception => e
+							raise ArgumentError.new("Unable to run #{args[:module]}, check " +
+							"required options\n" + "#{e.backtrace}")
+						end
+					else 
+						print_error "#{item.class} is not a host!"
+					end # end if
+				end # end each
+			else
+				print_error "Nothing in the set!" 
+			end # end if
+		end # end method
+		
+		def run_exploit(inst, args={}, opts={})
+			raise ArgumentError.new ("Missing payload") unless args[:payload]
+			# TODO:  Do we need validation of other args this far down in the call stack?
+			# TODO:  Need to be able to handle TARGETS (os_name?), what else?
+			if args[:set].count > 0
+				args[:set].each do |item| 
+					if item.class == Msf::DBManager::Host # TODO this could be service too maybe?
+						print_good "Running #{inst.name} against #{item.address}"
+						#`
+						# Do it like a boss d-_-b
+						#
+						# If exploit mods ever supported RHOSTS, we could consolidate RHOSTS...
+						opts[:RHOST] = item.address.to_s # must use string as key, datastore cranky
+						begin
+							print_deb "Input is: #{inst.user_input}, Output is: #{inst.user_output}"
+							ex = inst.exploit_simple(
 									'Payload'     => args[:payload],
 									'Options'		=> opts,
 									'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
 									'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
 									# Is there a way to make output be the console?
 									#'RunAsJob'		=> true
-									)
-									session.load_stdapi
-								else
-									# WTFBBQ?
-							# TODO:  check if most aux/post mods write to the db, otherwise report
-							# aux.report_note({
-							#				:data => "required" #whatever it is you're making a note of
-							#				:type => "required" # type of note, e.g. smb_peer_os
-							# 				:workspace => "optional" # workspace to associate w/note
-							#				:host => item.address #IP address or Host obj to assoc.
-							#				:service => "optional" #Service object to assoc.
-							#				:port =>	"optional" #along with :host and proto, a
-										# service to associate with this Note
-							#				:proto => "optional" along with :host and port, a 
-										# service to associate with this Note
-							#				:update => what to do in case a similar Note exists
-										# The +:update+ option can have the following values:
-											#unique+::allow only a single Note per +:host+/+:type+ pair
-											#:unique_data+::like +:uniqe+, but also compare +:data+
-											#:insert+::always insert a new Note regardless
-							#				})
-							
-							end # end case
+												)
+									#inst.session_created?
+									#inst.session_count
+									ex.session.load_stdapi if ex and ex.session_created?
+									#session.load_stdapi
 
 						rescue Exception => e
-							raise("Unable to run module #{modjool}, check required options\n" +
-							"#{e.backtrace}")
+							raise ArgumentError.new("Unable to run #{args[:module]}, check " +
+							"required options\n" + "#{e.backtrace}")
+							# could show datastore here
 						end
 					else 
 						print_error "#{item.class} is not a host!"
-					end
-				end
+					end # end if
+				end # end each
 			else
 				print_error "Nothing in the set!" 
-			end
-		end
-		
-		def get_instance(framework,modjool)
-			working = ["auxiliary","exploits","payloads","post"]
-			unsupported = ["encoders","nops"]
-			nonsense = ["payloads"]
-			working.each do |type|
-				if framework.send(type).include?(modjool)
-					# then this modjool is valid and of type type
-					if nonsense.include?(modjool)
-						# Then this don't make no damn sense
-						raise ArgumentError.new ("It doesn't make sense to use #{modjool} as a module")
-					else
-						return framework.send(type).create(modjool)
-					end
-				end
-			end
-			# if that wasn't a good module, let's see if we can tell why
-			unsupported.each do |type|
-				if framework.send(type).include?(modjool)
-					# Then we recognize your module but don't support it
-					raise ArgumentError.new ("The module is valid but it's type (#{type}) is not supported")
-				end
-			end
-			# otherwise this modjool just isn't recognized as a valid module
-			raise ArgumentError.new ("#{modjool} is not a valid module")
+			end # end if
 		end # end method
-		
+				
 		# perform the actual search and return the matching set
 		def dbsearch (args=[])
 			# Make sure we form the class name correctly
