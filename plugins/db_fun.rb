@@ -41,7 +41,7 @@ class Plugin::DbFun < Msf::Plugin
 			"db_set_create" => "[id] - Set this query as the current db working set.",
 			"db_set_add_to" =>  "[id] - Add these items to the working set",
 			"db_set_del_from" => "[id] - Delete these items to the working set",	
-			"db_set_run_module" => "[id] module [paylaod] OPT=val - run modules against a set",
+			"db_set_run_module" => "[id] module [payload] OPT=val - run modules against a set",
 			"db_fun_show_examples" => "I'm confused, show me some examples",
 			"db_set_auto" => "Automatically create some default sets like: windows,linux,all_hosts,etc"
 		}
