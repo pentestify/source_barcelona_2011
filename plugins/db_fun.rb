@@ -143,8 +143,8 @@ class Plugin::DbFun < Msf::Plugin
 					# if this arg matches a known module, assume it's a module
 					mod_args[:module] = modjool
 					args.shift # this doesn't throw an error if args is empty
-				# else
-				#	raise ArgumentError.new ("The module (#{modjool} is not valid.)")
+				else
+					raise ArgumentError.new ("The module (#{modjool} is not valid.)")
 				end
 				
 				if fmwk.payloads.include?(args[0])
@@ -233,7 +233,7 @@ class Plugin::DbFun < Msf::Plugin
 			modjool.gsub!(/^auxiliary|^encoders|^exploit[s]*|^nops|^payloads|^post/,'')
 			modjool.gsub!(/^[\\\/]+/,'') # this is supposed to get rid of leading slashes
 			print_deb "modjool with leading module types stripped: #{modjool}"
-			modjool
+			return modjool
 		end
 		
 		#
