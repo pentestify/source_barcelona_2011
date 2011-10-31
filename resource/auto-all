@@ -1,0 +1,14 @@
+# msfconsole resource script to glue together a bunch of others
+# $Name:  auto-all
+# $Author: kernelsmith
+
+# lets see if we can change dir to help with resource chaining
+cd "/home/ks/Ubuntu One/talks/source_barcelona_2011/resource"
+
+# NOTE:  You can't use inline comments in resource files it seems
+
+# setup a multihandler
+resource auto-multi-handler
+
+# run psexec against a host
+resource auto-psexec

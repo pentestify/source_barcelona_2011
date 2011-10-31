@@ -362,6 +362,53 @@ class Plugin::DbFun < Msf::Plugin
 		
 		def run_post(inst, args={}, opts={})
 			# TODO:  Do we need validation of args this far down in the call stack?
+			#
+			#  Session Info: lib/msf/ui/console/command_dispatcher/core.rb
+			#print(Serializer::ReadableText.dump_sessions(framework, :verbose => verbose))
+==begin
+				cmds.each do |cmd|
+					if sid
+						sessions = [ sid ]
+					else
+						sessions = framework.sessions.keys.sort
+					end
+					sessions.each do |s|
+						session = framework.sessions.get(s)
+						print_status("Running '#{cmd}' on #{session.type} session #{s} (#{session.tunnel_peer})")
+
+						if (session.type == "meterpreter")
+							# If session.sys is nil, dont even try..
+							if not (session.sys)
+								print_error("Session #{s} does not have stdapi loaded, skipping...")
+								next
+							end
+							c, c_args = cmd.split(' ', 2)
+							begin
+								process = session.sys.process.execute(c, c_args,
+									{
+										'Channelized' => true,
+										'Hidden'      => true
+									})
+							rescue ::Rex::Post::Meterpreter::RequestError
+								print_error("Failed: #{$!.class} #{$!}")
+							end
+							if process and process.channel and (data = process.channel.read)
+								print_line(data)
+							end
+						elsif session.type == "shell"
+							if (output = session.shell_command(cmd))
+								print_line(output)
+							end
+						end
+						# If the session isn't a meterpreter or shell type, it
+						# could be a VNC session (which can't run commands) or
+						# something custom (which we don't know how to run
+						# commands on), so don't bother.
+					end
+				end
+==end		#
+			
+			#
 			if args[:set].count > 0
 				args[:set].each do |item| 
 					if item.class == Msf::DBManager::Host # Need SESSIONS here, unless we
@@ -470,7 +517,7 @@ class Plugin::DbFun < Msf::Plugin
 				# Parse argument string
 				args.each_with_index do |arg,i|
 				
-					print_line "parsing arg #{arg}"
+					print_deb "parsing arg #{arg}"
 				
 					if arg.downcase =~ /where/
 						filters << args[i+1]
@@ -653,7 +700,7 @@ class Plugin::DbFun < Msf::Plugin
     		def get_columns(class_name)
     			columns = []
 			global_add = ['id']
-    			global_remove = ['created_at', 'updated_at']
+    			global_remove = ['created_at', 'updated_at', 'datastore']
 	
 			if class_name == "Host"
 				columns = [ 'address','name','state','os_name','os_flavor']

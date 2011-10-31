@@ -1,0 +1,19 @@
+# msfconsole resource script to automatically set LHOST
+# $Name:  auto-LHOST
+# $Author: kernelsmith
+
+# automatically figure out LHOST as best we can
+<ruby>
+	# target_net is important if you have multiple interfaces and want you want a specific one
+	# the interface LHOST will be set to is chosen by what interface is used to route to target_net
+	# whether or not target_net exists is irrelevant, but if it doesn't LHOST will become
+	# whatever interface is connected to the default route, in that case target_net could be any
+	# publicly routable IP, or just nil
+	# if you are using virtual interfaces etc, you might want target_net to be one of your vmnets
+	
+	target_net = "192.168.170.1"  # set this to nil or any public ip if you want your default interf.
+	
+	my_interface = Rex::Socket.source_address(target_net || "1.1.1.1")
+	run_single("set LHOST #{my_interface}")
+	run_single("setg LHOST #{my_interface}")
+</ruby>

