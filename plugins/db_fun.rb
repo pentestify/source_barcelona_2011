@@ -13,6 +13,8 @@ class Plugin::DbFun < Msf::Plugin
 			@working_set = []
 			@sets = {}
 			@debug = true
+			@output = driver.output
+			@input = driver.input
 		end
 		
 		attr_accessor :debug
@@ -336,15 +338,13 @@ class Plugin::DbFun < Msf::Plugin
 						opts[:RHOSTS.to_s] = item.address # must use string as key, datastore cranky
 						begin
 							# Move print_deb input and output to after run_simple?
-							print_deb "Input is: #{inst.user_input}, Output is: #{inst.user_output}"
 							inst.run_simple(
 								'Payload'     	=> args[:payload],
 								'Options'		=> opts,
-								'LocalInput'	=> inst.user_input,
-								'LocalOutput'	=> inst.user_output,
+								'LocalInput'	=> @input,
+								'LocalOutput'	=> @output,
 								#'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
 								#'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
-								# Is there a way to make output be the console?
 								#'RunAsJob'		=> true
 											)
 						rescue Exception => e
@@ -365,7 +365,7 @@ class Plugin::DbFun < Msf::Plugin
 			#
 			#  Session Info: lib/msf/ui/console/command_dispatcher/core.rb
 			#print(Serializer::ReadableText.dump_sessions(framework, :verbose => verbose))
-==begin
+=begin
 				cmds.each do |cmd|
 					if sid
 						sessions = [ sid ]
@@ -406,7 +406,7 @@ class Plugin::DbFun < Msf::Plugin
 						# commands on), so don't bother.
 					end
 				end
-==end		#
+=end		#
 			
 			#
 			if args[:set].count > 0
@@ -422,15 +422,13 @@ class Plugin::DbFun < Msf::Plugin
 						#  for now let's just keep it simple
 						opts[:RHOSTS.to_s] = item.address # must use string as key, datastore cranky
 						begin
-							print_deb "Input is: #{inst.user_input}, Output is: #{inst.user_output}"
 							inst.run_simple(
 								'Payload'     	=> args[:payload],
 								'Options'		=> opts,
-								'LocalInput'	=> inst.user_input,
-								'LocalOutput'	=> inst.user_output,
+								'LocalInput'	=> @input,
+								'LocalOutput'	=> @output,
 								#'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
 								#'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
-								# Is there a way to make output be the console?
 								#'RunAsJob'		=> true
 											)
 						rescue Exception => e
@@ -447,6 +445,7 @@ class Plugin::DbFun < Msf::Plugin
 		end # end method
 		
 		def run_exploit(inst, args={}, opts={})
+			print_deb "self has class of #{self.class} and is #{self}"
 			raise ArgumentError.new ("Missing payload") unless args[:payload]
 			# TODO:  Do we need validation of other args this far down in the call stack?
 			# TODO:  Need to be able to handle TARGETS (os_name?), what else?
@@ -454,19 +453,17 @@ class Plugin::DbFun < Msf::Plugin
 				args[:set].each do |item| 
 					if item.class == Msf::DBManager::Host # TODO this could be service too maybe?
 						print_good "Running #{inst.name} against #{item.address}"
-						#`
+						#
 						# Do it like a boss d-_-b
 						#
 						# If exploit mods ever supported RHOSTS, we could consolidate RHOSTS...
-						opts[:RHOST] = item.address.to_s # must use string as key, datastore cranky
+						opts[:RHOST.to_s] = item.address # must use string as key, datastore cranky
 						begin
-							print_deb "Input is: #{inst.user_input}, Output is: #{inst.user_output}"
 							ex = inst.exploit_simple(
 									'Payload'     => args[:payload],
 									'Options'		=> opts,
-									'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
-									'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
-									# Is there a way to make output be the console?
+									'LocalInput'	=> @input,
+									'LocalOutput'	=> @output,
 									#'RunAsJob'		=> true
 												)
 									#inst.session_created?
