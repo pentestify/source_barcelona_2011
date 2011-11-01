@@ -13,6 +13,8 @@ class Plugin::DbFun < Msf::Plugin
 			@working_set = []
 			@sets = {}
 			@debug = true
+			@output = driver.output
+			@input = driver.input
 		end
 		
 		attr_accessor :debug
@@ -27,7 +29,7 @@ class Plugin::DbFun < Msf::Plugin
 		#end
 		
 		def print_deb(msg='')
-			print_good("[debug] #{msg}") if @debug
+			print_line("%bld%mag[debug]%clr #{msg}") if @debug
 		end
 
 		# TODO:  Turn a set into it's own class?  I guess it already has a class from DbManager?
@@ -116,7 +118,11 @@ class Plugin::DbFun < Msf::Plugin
 			return fun_usage unless args.count > 0
 			#TODO:  Add support for searching for an empty or nil column value
 			result_set = self.dbsearch(args)
-			hlp_print_set result_set, "Searched Set" #, class_name
+			if result_set.length > 0
+				hlp_print_set(result_set, "Searched Set")
+			else
+				print_error "Your search did not return any results"
+			end
 		end
 		
 		def cmd_db_fun_debug(bool=nil)
@@ -209,6 +215,7 @@ class Plugin::DbFun < Msf::Plugin
 			self.create_set("windows", "hosts where os_name~windows")
 			self.create_set("linux", "hosts where os_name~linux")
 			self.create_set("all_hosts", "hosts")
+			self.create_set("all_active_sessions", "sessions where closed_at=nil")
 			#self.create_set("unknown","hosts where os_name=nil")
 			cmd_db_set_list
 		end
@@ -236,13 +243,28 @@ class Plugin::DbFun < Msf::Plugin
 		end
 		
 		protected
-		
+		#
+		# Determines what we will treat as "nil-like" values
+		# This will hopefully give the user some flexbility in searching for "nil"
+		#
+		def is_nil_like?(val=nil)
+			val = val.to_s if val.respond_to?("to_s")
+			# let's be explicit here:
+			return true if (val.nil? or val =~ /^\s$/ or val.empty? or val.downcase == "nil")
+			false
+		end
+		#
+		# Actually creates a db set
+		#
 		def create_set(set_id,search_str)
 			args = search_str.split(" ")
 			self.dbsearch(args)
 			self.cmd_db_set_create(set_id)
 		end
 		
+		#
+		# Normalize module names/paths
+		#
 		def normalize_module(m)
 			raise ArgumentError.new "Could not normalize module, no module given" unless m
 			# TODO:  Improve this ghetto crap
@@ -336,15 +358,13 @@ class Plugin::DbFun < Msf::Plugin
 						opts[:RHOSTS.to_s] = item.address # must use string as key, datastore cranky
 						begin
 							# Move print_deb input and output to after run_simple?
-							print_deb "Input is: #{inst.user_input}, Output is: #{inst.user_output}"
 							inst.run_simple(
 								'Payload'     	=> args[:payload],
 								'Options'		=> opts,
-								'LocalInput'	=> inst.user_input,
-								'LocalOutput'	=> inst.user_output,
+								'LocalInput'	=> @input,
+								'LocalOutput'	=> @output,
 								#'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
 								#'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
-								# Is there a way to make output be the console?
 								#'RunAsJob'		=> true
 											)
 						rescue Exception => e
@@ -362,10 +382,12 @@ class Plugin::DbFun < Msf::Plugin
 		
 		def run_post(inst, args={}, opts={})
 			# TODO:  Do we need validation of args this far down in the call stack?
+			
+			# run against any sessions matching our set (service or host)
 			#
 			#  Session Info: lib/msf/ui/console/command_dispatcher/core.rb
 			#print(Serializer::ReadableText.dump_sessions(framework, :verbose => verbose))
-==begin
+=begin
 				cmds.each do |cmd|
 					if sid
 						sessions = [ sid ]
@@ -406,7 +428,7 @@ class Plugin::DbFun < Msf::Plugin
 						# commands on), so don't bother.
 					end
 				end
-==end		#
+=end		#
 			
 			#
 			if args[:set].count > 0
@@ -422,15 +444,13 @@ class Plugin::DbFun < Msf::Plugin
 						#  for now let's just keep it simple
 						opts[:RHOSTS.to_s] = item.address # must use string as key, datastore cranky
 						begin
-							print_deb "Input is: #{inst.user_input}, Output is: #{inst.user_output}"
 							inst.run_simple(
 								'Payload'     	=> args[:payload],
 								'Options'		=> opts,
-								'LocalInput'	=> inst.user_input,
-								'LocalOutput'	=> inst.user_output,
+								'LocalInput'	=> @input,
+								'LocalOutput'	=> @output,
 								#'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
 								#'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
-								# Is there a way to make output be the console?
 								#'RunAsJob'		=> true
 											)
 						rescue Exception => e
@@ -447,6 +467,7 @@ class Plugin::DbFun < Msf::Plugin
 		end # end method
 		
 		def run_exploit(inst, args={}, opts={})
+			print_deb "self has class of #{self.class} and is #{self}"
 			raise ArgumentError.new ("Missing payload") unless args[:payload]
 			# TODO:  Do we need validation of other args this far down in the call stack?
 			# TODO:  Need to be able to handle TARGETS (os_name?), what else?
@@ -454,19 +475,17 @@ class Plugin::DbFun < Msf::Plugin
 				args[:set].each do |item| 
 					if item.class == Msf::DBManager::Host # TODO this could be service too maybe?
 						print_good "Running #{inst.name} against #{item.address}"
-						#`
+						#
 						# Do it like a boss d-_-b
 						#
 						# If exploit mods ever supported RHOSTS, we could consolidate RHOSTS...
-						opts[:RHOST] = item.address.to_s # must use string as key, datastore cranky
+						opts[:RHOST.to_s] = item.address # must use string as key, datastore cranky
 						begin
-							print_deb "Input is: #{inst.user_input}, Output is: #{inst.user_output}"
 							ex = inst.exploit_simple(
 									'Payload'     => args[:payload],
 									'Options'		=> opts,
-									'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
-									'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
-									# Is there a way to make output be the console?
+									'LocalInput'	=> @input,
+									'LocalOutput'	=> @output,
 									#'RunAsJob'		=> true
 												)
 									#inst.session_created?
@@ -489,13 +508,13 @@ class Plugin::DbFun < Msf::Plugin
 		end # end method
 				
 		# perform the actual search and return the matching set
-		def dbsearch (args=[])
+		def dbsearch(args=[])
 			# Make sure we form the class name correctly
 			class_name = args[0].downcase
 			class_name[0] = class_name[0].capitalize
 			class_name = class_name.singularize
 						
-			print_deb ("Class name: " + class_name)
+			print_deb ("Class name:  #{class_name}")
 			 
 			begin
 				eval("Msf::DBManager::#{class_name}.respond_to?(:find)")
@@ -600,31 +619,47 @@ class Plugin::DbFun < Msf::Plugin
 				###
 				##	Filter items
 				###
+
 				item_set.each do |item|
-					
 					# Look through for the user-specified filters
 					equal_conditions.each_pair do |method,value|
-						value = nil if value == "nil"
-						db_object = eval("item.#{method}")
-
 						# we should get an object by looking for the 
 						# user-specified filter item (unless it doesn't
-						# exist in the database...						
-						if db_object.to_s == value
+						# exist in the database...)
+						db_object = eval("item.#{method}") # get the value we want to examine
+
+						# handle the case when people are looking for nil-like values					
+						if self.is_nil_like?(value)
+							print_deb "search value (#{value}) IS NIL-LIKE, checking for nil-like db object"
+							# if they are searching for something akin to nil then
+							# let's match if the db_object entry is akin to nil
+							@working_set << item if self.is_nil_like?(db_object)
+						elsif db_object.to_s == value
+							# otherwise we do a normal comparison
 							@working_set << item
 						end
 					end
 
 					# Look for match conditions
 					match_conditions.each_pair do |method,value|
-						db_object = eval("item.#{method}")
-						if db_object.to_s =~ Regexp.new(value,true)
+						# we should get an object by looking for the 
+						# user-specified filter item (unless it doesn't
+						# exist in the database...)
+						db_object = eval("item.#{method}") # get the value we want to examine
+						
+						# handle the case when people are looking for nil-like values
+						# especially since doing a regex comparison on nil is kinda rough...				
+						if is_nil_like?(value)
+							# if they are searching for something akin to nil then
+							# let's match if the db_object entry is akin to nil
+							@working_set << item if self.is_nil_like?(db_object)
+						elsif db_object.to_s =~ Regexp.new(value,true)
+							# otherwise we do a normal regex comparison
 							@working_set << item
 						end
 					end
 				end
 			end
-			
 			return @working_set
 		end
 	
@@ -649,14 +684,13 @@ class Plugin::DbFun < Msf::Plugin
 			end	
 		end
 		
-		def hlp_print_set(set=[], header="Working Set", class_name="Host")
+		def hlp_print_set(set=[], header="Working Set", class_name=nil)
 			indent = '    '
 			
-			# TODO - this currently only support homogeneous sets
-			class_name = get_type(set.first)
+			# TODO - this currently only supports homogeneous sets, maybe allow class_name="Mixed" ?
+			class_name = get_type(set.first) unless class_name
 			
-			
-			print_deb "getting columns for #{class_name}"
+			print_deb "Getting columns for #{class_name}"
 			
 			calculated_columns = get_columns(class_name)
 
@@ -706,10 +740,18 @@ class Plugin::DbFun < Msf::Plugin
 				columns = [ 'address','name','state','os_name','os_flavor']
 			elsif class_name == "Service"
 				columns = ['port','proto','state','name']
+			elsif class_name == "Session"
+				columns = [ 'host_id', 'local_id', 'stype', 'closed_at', 'port', 'desc' ]
 			else
 				## generate the columns
 				columns = []
-	 			eval("Msf::DBManager::#{class_name}.columns.each {|type_col| columns << type_col.name }")
+				if Msf::DBManager.respond_to?("#{class_name}.columns")
+	 				eval("Msf::DBManager::#{class_name}.columns.each {|type_col| columns << type_col.name }")
+	 			else
+	 				print_error("The database does not recognize #{class_name} objects")
+	 				print_deb("Msf::DBManager didn't respond_to? #{class_name}.columns")
+	 				return []
+	 			end
 			end		
 
 			# Globally remove these    			
