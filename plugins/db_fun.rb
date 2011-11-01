@@ -19,15 +19,6 @@ class Plugin::DbFun < Msf::Plugin
 		
 		attr_accessor :debug
 		
-		# create instance method print_deb so we can turn it on and off w/o having to use lots of if stmts
-
-		#class Msf::Plugin
-		#	printdebug = self.instance_method(:print_deb)
-		#	define_method(:print_deb) do
-		#		printdebug.bind(self).call("[DEBUG] #{msg}") if @debug
-		#	end
-		#end
-		
 		def print_deb(msg='')
 			print_line("%bld%mag[debug]%clr #{msg}") if @debug
 		end
@@ -81,10 +72,11 @@ class Plugin::DbFun < Msf::Plugin
 			examples = {
 			:db_search => [ "db_search hosts where os_name~windo",
 							"db_search hosts where os_name=linux",
-							"db_search services where proto=tcp" ],
+							"db_search services where proto=tcp",
+							"db_search sessions where closed_at=nil" ],
 			"db_set_create" => "db_set_create 1  # creates db set with id 1 using latest query",
 			"db_set_add_to" =>  "db_set_add_to 1  # adds to db set 1 using latest query results",
-			"db_set_run_module" => "db_set_run_module 1 scanner/smb/smb_version # run mod against set 1",
+			"db_set_run_module" => "db_set_run_module windows scanner/smb/smb_version # run mod against set 'windows'",
 			}
 			#just do a simple display for now
 			print_good "db_fun command examples"
@@ -211,12 +203,11 @@ class Plugin::DbFun < Msf::Plugin
 		# Automatically create some default sets such as windows, linux, all_hosts, all_services etc
 		def cmd_db_set_auto
 			#TODO:  Find a way to persist sets by serializing? them to .msf4 etc
-			#TODO:  Add set where hosts os_name is nil or unknown -- need to ask jcran how 2 do nil
 			self.create_set("windows", "hosts where os_name~windows")
 			self.create_set("linux", "hosts where os_name~linux")
 			self.create_set("all_hosts", "hosts")
 			self.create_set("all_active_sessions", "sessions where closed_at=nil")
-			#self.create_set("unknown","hosts where os_name=nil")
+			self.create_set("unknown", "hosts where os_name=nil")
 			cmd_db_set_list
 		end
 		
@@ -313,8 +304,8 @@ class Plugin::DbFun < Msf::Plugin
 			when /auxiliary/
 				self.run_aux(inst,args,opts)
 			when /post/
-				print_error "post modules are not supported yet"
-				#self.run_post(inst,args,opts)
+				#print_error "post modules are not supported yet"
+				self.run_post(inst,args,opts)
 			when /exploit/
 				self.run_exploit(inst,args,opts)
 			when /payload/
@@ -383,7 +374,42 @@ class Plugin::DbFun < Msf::Plugin
 		def run_post(inst, args={}, opts={})
 			# TODO:  Do we need validation of args this far down in the call stack?
 			
-			# run against any sessions matching our set (service or host)
+			# run against any sessions matching our set (service or host) or a sessions set?
+			# TODO:  support hosts and services, but convert them to any live sessions
+			# for now, the set must be of type Session
+			
+			if args[:set].count > 0
+				args[:set].each do |item| 
+					if item.class == Msf::DBManager::Session
+						print_good "Running #{inst.name} against session #{item.local_id}" #TODO:  host,address,id?
+						#`
+						# Do it like a boss d-_-b
+						#
+
+						opts[:SESSION.to_s] = item.local_id # must use string as key, datastore cranky
+						begin
+							inst.run_simple(
+								#'Payload'     	=> args[:payload],
+								'Options'		=> opts,
+								'LocalInput'	=> @input,
+								'LocalOutput'	=> @output,
+								#'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
+								#'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
+								#'RunAsJob'		=> true
+											)
+						rescue Exception => e
+							raise ArgumentError.new("Unable to run #{args[:module]}, check " +
+							"required options\n" + "#{e.backtrace}")
+						end
+					else 
+						print_error "#{item.class} is not a session!"
+					end # end if
+				end # end each
+			else
+				print_error "Nothing in the set!" 
+			end # end if
+			
+			# NOTES:  
 			#
 			#  Session Info: lib/msf/ui/console/command_dispatcher/core.rb
 			#print(Serializer::ReadableText.dump_sessions(framework, :verbose => verbose))
@@ -430,40 +456,6 @@ class Plugin::DbFun < Msf::Plugin
 				end
 =end		#
 			
-			#
-			if args[:set].count > 0
-				args[:set].each do |item| 
-					if item.class == Msf::DBManager::Host # Need SESSIONS here, unless we
-													# correllate using ~ sessions -l -v
-						print_good "Running #{inst.name} against #{item.address}"
-						#`
-						# Do it like a boss d-_-b
-						#
-						# TODO:  it's probably a good idea to consolidate RHOSTS at some point
-						#  to avoid calling the same module repeatedly for each ip, instead of once
-						#  for now let's just keep it simple
-						opts[:RHOSTS.to_s] = item.address # must use string as key, datastore cranky
-						begin
-							inst.run_simple(
-								'Payload'     	=> args[:payload],
-								'Options'		=> opts,
-								'LocalInput'	=> @input,
-								'LocalOutput'	=> @output,
-								#'LocalInput'	=> Rex::Ui::Text::Input::Buffer.new,
-								#'LocalOutput'	=> Rex::Ui::Text::Output::Buffer.new,
-								#'RunAsJob'		=> true
-											)
-						rescue Exception => e
-							raise ArgumentError.new("Unable to run #{args[:module]}, check " +
-							"required options\n" + "#{e.backtrace}")
-						end
-					else 
-						print_error "#{item.class} is not a host!"
-					end # end if
-				end # end each
-			else
-				print_error "Nothing in the set!" 
-			end # end if
 		end # end method
 		
 		def run_exploit(inst, args={}, opts={})
@@ -630,7 +622,7 @@ class Plugin::DbFun < Msf::Plugin
 
 						# handle the case when people are looking for nil-like values					
 						if self.is_nil_like?(value)
-							print_deb "search value (#{value}) IS NIL-LIKE, checking for nil-like db object"
+							#print_deb "#{value} IS NIL-LIKE, checking for nil-like db object"
 							# if they are searching for something akin to nil then
 							# let's match if the db_object entry is akin to nil
 							@working_set << item if self.is_nil_like?(db_object)
