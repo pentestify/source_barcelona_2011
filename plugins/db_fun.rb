@@ -684,7 +684,7 @@ class Plugin::DbFun < Msf::Plugin
 			
 			print_deb "Getting columns for #{class_name}"
 			
-			calculated_columns = get_columns(class_name)
+			calculated_columns,all_possible_columns = get_columns(class_name)
 
 			print_deb "header => #{header.to_s}"
 			print_deb "columns => #{calculated_columns.to_s}"
@@ -713,6 +713,7 @@ class Plugin::DbFun < Msf::Plugin
 			
 			# print the bastard
 			print_line tbl.to_s
+			print_line "\nAll possible columns: #{all_possible_columns.to_s}"
 		end
     		    		
     		# TODO - I'm sure there's a better way to do this... 
@@ -724,35 +725,41 @@ class Plugin::DbFun < Msf::Plugin
     		# There's some reflection magic in here in case we don't want to manually
     		# specify which items we care about
     		def get_columns(class_name)
-    			columns = []
-			global_add = ['id']
-    			global_remove = ['created_at', 'updated_at', 'datastore']
+    			columns = []  # the standard columns we will show depending on the type
+    			all_possible_columns = [] # every column available depending on type
+				global_add = ['id'] # the standard columns that we'll always show
+    			global_remove = ['created_at', 'updated_at', 'datastore'] # stuff we never show
 	
-			if class_name == "Host"
-				columns = [ 'address','name','state','os_name','os_flavor']
-			elsif class_name == "Service"
-				columns = ['port','proto','state','name']
-			elsif class_name == "Session"
-				columns = [ 'host_id', 'local_id', 'stype', 'closed_at', 'port', 'desc' ]
-			else
-				## generate the columns
-				columns = []
-				if Msf::DBManager.respond_to?("#{class_name}.columns")
-	 				eval("Msf::DBManager::#{class_name}.columns.each {|type_col| columns << type_col.name }")
-	 			else
+				if class_name == "Host"
+					columns = [ 'address','name','state','os_name','os_flavor','os_sp']
+				elsif class_name == "Service"
+					columns = ['port','proto','state','name']
+				elsif class_name == "Session"
+					columns = [ 'host_id', 'local_id', 'stype', 'closed_at', 'port', 'desc' ]
+				end
+
+				## generate all possible columns
+				if eval("Msf::DBManager::#{class_name}.respond_to?('columns')")
+	 				eval("Msf::DBManager::#{class_name}.columns.each do |type_col|
+	 						all_possible_columns << type_col.name
+	 					end")
+	 			end
+	 			if all_possible_columns.empty?
 	 				print_error("The database does not recognize #{class_name} objects")
 	 				print_deb("Msf::DBManager didn't respond_to? #{class_name}.columns")
 	 				return []
-	 			end
-			end		
+	 			end		
 
-			# Globally remove these    			
-			columns = columns - global_remove
+				# if columns is still empty, just dup all_possible_columns
+				columns = all_possible_columns.dup if columns.empty?
+				
+				# Globally remove these    			
+				columns = columns - global_remove
 
-			# Globally add these
-			columns =  global_add | columns
+				# Globally add these
+				columns =  global_add | columns
 
-    			return columns
+    			return [columns,all_possible_columns]
     		end
     		
     		

