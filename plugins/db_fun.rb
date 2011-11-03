@@ -30,16 +30,17 @@ class Plugin::DbFun < Msf::Plugin
 		#
 		def commands
 		{
-			"db_search" => "db_search [type] [ WHERE [sub_type] CONTAINS [column]=[value] [OR ...] ] - Find database items",
-			"db_set_list" => "List all sets",
-			"db_set_show" => "[id] - Show the set",
-			"db_set_create" => "[id] - Set this query as the current db working set.",
-			"db_set_auto" => "Automatically create some default sets like: windows,linux,all_hosts,etc",
-			"db_set_add_to" =>  "[id] - Add these items to the working set",
-			"db_set_del_from" => "[id] - Delete these items to the working set",	
-			"db_set_run_module" => "[id] module [payload] [OPT=val] # run module against set",
-			"db_fun_show_examples" => "I'm confused, show me some examples",
-			"db_fun_debug" => "db_fun_debug [true|false] # sets or displays debug setting",
+			"db_search"		=> "[type] [ WHERE [sub_type] CONTAINS [column]=[value] [OR ...] ] - Find database items",
+			"db_set_list" 	=> "List all sets",
+			"db_set_show" 	=> "[id] - Show the set",
+			"db_set_create"	=> "[id] - Set this query as the current db working set.",
+			"db_set_auto"	=> "Automatically create some default sets like: windows,linux,all_hosts,etc",
+			"db_set_add_to"	=>  "[id] - Add these items to the working set",
+			"db_set_del_from"	=> "[id] - Delete these items from the working set",	
+			"db_set_run_module"	=> "[id] module [payload] [OPT=val] # run module against set",
+			"db_fun_show_examples"	=> "I'm confused, show me some examples",
+			"db_fun_debug" 	=> "[true|false] # sets or displays debug setting"
+			"db_fun_note" 	=> "\"my note\" [id] # create note on a host or set id",
 		}
 		end
 
@@ -233,7 +234,101 @@ class Plugin::DbFun < Msf::Plugin
 			end
 		end
 		
+		#
+		# Adds a simple note or notes to a db entry or db_fun set
+		#
+		def cmd_db_fun_note(*args)
+			# the required hash elements for a good note:
+			# required_elements = [ :data, :type]
+			# note hash that we ultimately send to make_note, with default values
+			note_hash = [
+						:type => "db_fun"
+						:host => nil
+						:service => nil
+						:workspace => nil # if none of above given, current workspace  assumed
+						:port => nil
+						:proto => nil
+						:update => :unique # allow only a single Note per +:host+/+:type+ pair
+						:seen => nil
+						:critical => nil
+						]
+			# populate the note hash with user supplied info
+			case args.length
+			when 1
+				note = arg[0]
+				id = nil
+				# assume it's a super simple note for the workspace and default everything else
+				note_hash[:data] = note
+				self.make_note(note_hash)
+			when 2
+				note = arg[0]
+				id = arg[1]
+				note_hash[:data] = note
+				# TODO: figure out what kind of id they are using
+				# if id is host id, just set :host => id
+				# if id is set id, loop over objects in set & make note for each :host => obj[host]
+				# hsh.merge(other_hash) # other_hash wins conflicts by default
+				
+				self.make_note(note_hash)
+			else
+				return fun_usage
+			end
+			
+			fmwk = self.framework
+			if fmwk.db and fmwk.db.active
+				begin
+					note_hash[:workspace] = fmwk.db.workspace unless note_hash[:workspace]
+					self.make_note(note_hash, fmwk)
+				rescue Exception => e
+					print_error "Unable to create note, reason:  #{e.to_s}"
+				end
+			else
+				#do we let them know, or raise an error... hrm for now:
+				print_error "Database is not active"
+			end
+		end
+		
 		protected
+		
+		#
+		# Actually adds a note to the db, basically validate & proxy to Msf::DBManager::report_note
+		#
+		# expects a hash
+		def make_note (note_hash, framework=self.framework)
+			# the required hash elements for a good note
+			required_elements = [:data, :type]
+			required_elements.each do |elem|
+				raise ArgumentError.new "Missing required element (#{elem}) for the note"
+			end
+			framework.db.report_note(note_hash)
+				
+	#
+	# Report a Note to the database.  Notes can be tied to a Workspace, Host, or Service.
+	#
+	# opts MUST contain
+	# +:data+::  whatever it is you're making a note of
+	# +:type+::  The type of note, e.g. smb_peer_os
+	#
+	# opts can contain
+	# +:workspace+::  the workspace to associate with this Note
+	# +:host+::       an IP address or a Host object to associate with this Note
+	# +:service+::    a Service object to associate with this Note
+	# +:port+::       along with :host and proto, a service to associate with this Note
+	# +:proto+::      along with :host and port, a service to associate with this Note
+	# +:update+::     what to do in case a similar Note exists, see below
+	#
+	# The +:update+ option can have the following values:
+	# +:unique+::       allow only a single Note per +:host+/+:type+ pair
+	# +:unique_data+::  like +:uniqe+, but also compare +:data+
+	# +:insert+::       always insert a new Note even if one with identical values exists
+	#
+	# If the provided +:host+ is an IP address and does not exist in the
+	# database, it will be created.  If +:workspace+, +:host+ and +:service+
+	# are all omitted, the new Note will be associated with the current
+	# workspace.
+	#
+		end # make_note
+		
 		#
 		# Determines what we will treat as "nil-like" values
 		# This will hopefully give the user some flexbility in searching for "nil"
