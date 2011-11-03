@@ -39,7 +39,7 @@ class Plugin::DbFun < Msf::Plugin
 			"db_set_del_from"	=> "[id] - Delete these items from the working set",	
 			"db_set_run_module"	=> "[id] module [payload] [OPT=val] # run module against set",
 			"db_fun_show_examples"	=> "I'm confused, show me some examples",
-			"db_fun_debug" 	=> "[true|false] # sets or displays debug setting"
+			"db_fun_debug" 	=> "[true|false] # sets or displays debug setting",
 			"db_fun_note" 	=> "\"my note\" [id] # create note on a host or set id",
 		}
 		end
@@ -238,53 +238,58 @@ class Plugin::DbFun < Msf::Plugin
 		# Adds a simple note or notes to a db entry or db_fun set
 		#
 		def cmd_db_fun_note(*args)
+
 			# the required hash elements for a good note:
 			# required_elements = [ :data, :type]
 			# note hash that we ultimately send to make_note, with default values
-			note_hash = [
-						:type => "db_fun"
-						:host => nil
-						:service => nil
-						:workspace => nil # if none of above given, current workspace  assumed
-						:port => nil
-						:proto => nil
-						:update => :unique # allow only a single Note per +:host+/+:type+ pair
-						:seen => nil
-						:critical => nil
-						]
-			# populate the note hash with user supplied info
+			note_hash = {
+						:type => "db_fun",
+						:host => nil,
+						:service => nil,
+						:workspace => nil, # if none of above given, current workspace  assumed
+						:port => nil,
+						:proto => nil,
+						:update => :unique, # allow only a single Note per +:host+/+:type+ pair
+						:seen => nil,
+						:critical => nil,
+						}
+
+			# Check if the database is active, otherwise crap out
+			fmwk = self.framework
+			if fmwk.db and fmwk.db.active
+				begin
+					note_hash[:workspace] = fmwk.db.workspace unless note_hash[:workspace]
+				rescue Exception => e
+					print_error "Unable to determine active workspace, reason:  #{e.to_s}"
+				end
+			else
+				#do we just let them know, or raise an error... hrm for now:
+				raise  RuntimeError.new "Database is not active"
+			end
+
+			# Lookin' good, let's populate the note hash with user supplied info
 			case args.length
 			when 1
-				note = arg[0]
+				note_hash[:data] = args[0]
 				id = nil
 				# assume it's a super simple note for the workspace and default everything else
-				note_hash[:data] = note
 				self.make_note(note_hash)
 			when 2
-				note = arg[0]
-				id = arg[1]
-				note_hash[:data] = note
+				note_hash[:data] = args[0]
+				id = args[1]
 				# TODO: figure out what kind of id they are using
 				# if id is host id, just set :host => id
-				# if id is set id, loop over objects in set & make note for each :host => obj[host]
+				
+				# if the first arg seems to be a key in @sets, assume it's a set_id
+				if @sets.has_key?(id)
+					# loop over objects in set & make note for each :host => obj[host]
+				end
+					
 				# hsh.merge(other_hash) # other_hash wins conflicts by default
 				
 				self.make_note(note_hash)
 			else
 				return fun_usage
-			end
-			
-			fmwk = self.framework
-			if fmwk.db and fmwk.db.active
-				begin
-					note_hash[:workspace] = fmwk.db.workspace unless note_hash[:workspace]
-					self.make_note(note_hash, fmwk)
-				rescue Exception => e
-					print_error "Unable to create note, reason:  #{e.to_s}"
-				end
-			else
-				#do we let them know, or raise an error... hrm for now:
-				print_error "Database is not active"
 			end
 		end
 		
@@ -295,10 +300,12 @@ class Plugin::DbFun < Msf::Plugin
 		#
 		# expects a hash
 		def make_note (note_hash, framework=self.framework)
+			print_deb "Attempting to create note with #{note_hash.inspect}"
 			# the required hash elements for a good note
-			required_elements = [:data, :type]
+			required_elements = [:data,:type]
 			required_elements.each do |elem|
-				raise ArgumentError.new "Missing required element (#{elem}) for the note"
+				raise ArgumentError.new "Missing required element (#{elem}) " +
+				"for the note" unless note_hash[elem]
 			end
 			framework.db.report_note(note_hash)
 				
