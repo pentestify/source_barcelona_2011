@@ -54,16 +54,16 @@ class Plugin::DbFun < Msf::Plugin
 		def commands
 		{
 			"db_search"		=> "[type] [ WHERE [sub_type] CONTAINS [column]=[value] [OR ...] ] - Find database items",
-			"db_set_list" 	=> "List all sets",
-			"db_set_show" 	=> "[id] - Show the set",
-			"db_set_create"	=> "[id] - Set this query as the current db working set.",
-			"db_set_auto"	=> "Automatically create some default sets like: windows,linux,all_hosts,etc",
-			"db_set_add_to"	=>  "[id] - Add these items to the working set",
+			"db_set_list" 		=> "List all sets",
+			"db_set_show" 		=> "[id] - Show the set",
+			"db_set_create"		=> "[id] - Set this query as the current db working set.",
+			"db_set_auto"		=> "Automatically create some default sets like: windows,linux,all_hosts,etc",
+			"db_set_add_to"		=> "[id] - Add these items to the working set",
 			"db_set_del_from"	=> "[id] - Delete these items from the working set",	
 			"db_set_run_module"	=> "[id] module [payload] [OPT=val] # run module against set",
 			"db_fun_show_examples"	=> "I'm confused, show me some examples",
-			"db_fun_debug" 	=> "[true|false] # sets or displays debug setting",
-			"db_fun_note" 	=> "[id] \"my note\" # create note on current workspace, or a set",
+			"db_fun_debug" 		=> "[true|false] # sets or displays debug setting",
+			"db_fun_note" 		=> "[id] \"my note\" # create note on current workspace, or a set",
 		}
 		end
 
@@ -82,26 +82,26 @@ class Plugin::DbFun < Msf::Plugin
 		#alias old_cmd_db_status cmd_db_status
 		#def cmd_db_status(*args)
 		#	old_cmd_db_status(args)
-        #	if framework.db.driver
-        #		if ActiveRecord::Base.connected? and ActiveRecord::Base.connection.active?
-        #			if ActiveRecord::Base.connection.respond_to? :current_database
-        #				cdb = ActiveRecord::Base.connection.current_database
-        # 			end
-        #			print_status("Database has the following sets:\nself.cmd_db_set_list")
+        	#	if framework.db.driver
+       		#		if ActiveRecord::Base.connected? and ActiveRecord::Base.connection.active?
+       		#			if ActiveRecord::Base.connection.respond_to? :current_database
+		#				cdb = ActiveRecord::Base.connection.current_database
+		# 			end
+	        #			print_status("Database has the following sets:\nself.cmd_db_set_list")
 		#		end
 		#	end
-        #end
+        	#end
         
 		def cmd_db_fun_show_examples()
 			examples = {
-			:db_search => [ "db_search hosts where os_name~windo",
+			:db_search => [ 		"db_search hosts where os_name~windo",
 							"db_search hosts where os_name=linux",
 							"db_search services where proto=tcp",
 							"db_search sessions where closed_at=nil" ],
-			"db_set_create" => "db_set_create 1  # creates db set with id 1 using latest query",
-			"db_set_add_to" =>  "db_set_add_to 1  # adds to db set 1 using latest query results",
-			"db_set_run_module" => "db_set_run_module windows scanner/smb/smb_version # run mod against set 'windows'",
-			"db_fun_note" => "db_fun_note servers 'Acting as servers' # Add note to 'servers' set"
+							"db_set_create" => "db_set_create 1  # creates db set with id 1 using latest query",
+							"db_set_add_to" =>  "db_set_add_to 1  # adds to db set 1 using latest query results",
+							"db_set_run_module" => "db_set_run_module windows scanner/smb/smb_version # run mod against set 'windows'",
+							"db_fun_note" => "db_fun_note servers 'Acting as servers' # Add note to 'servers' set"
 			}
 			#just do a simple display for now
 			print_status "db_fun command examples"
@@ -112,7 +112,6 @@ class Plugin::DbFun < Msf::Plugin
 
 		def cmd_db_set_list(*args)
 			return fun_usage unless args.count == 0
-	
 			show_all_sets
 		end
 
@@ -371,31 +370,31 @@ class Plugin::DbFun < Msf::Plugin
 			print_deb "Sending note to db with #{notes_hash.inspect}"
 			framework.db.report_note(notes_hash)
 				
-	#
-	# Report a Note to the database.  Notes can be tied to a Workspace, Host, or Service.
-	#
-	# opts MUST contain
-	# +:data+::  whatever it is you're making a note of
-	# +:type+::  The type of note, e.g. smb_peer_os
-	#
-	# opts can contain
-	# +:workspace+::  the workspace to associate with this Note
-	# +:host+::       an IP address or a Host object to associate with this Note
-	# +:service+::    a Service object to associate with this Note
-	# +:port+::       along with :host and proto, a service to associate with this Note
-	# +:proto+::      along with :host and port, a service to associate with this Note
-	# +:update+::     what to do in case a similar Note exists, see below
-	#
-	# The +:update+ option can have the following values:
-	# +:unique+::       allow only a single Note per +:host+/+:type+ pair
-	# +:unique_data+::  like +:uniqe+, but also compare +:data+
-	# +:insert+::       always insert a new Note even if one with identical values exists
-	#
-	# If the provided +:host+ is an IP address and does not exist in the
-	# database, it will be created.  If +:workspace+, +:host+ and +:service+
-	# are all omitted, the new Note will be associated with the current
-	# workspace.
-	#
+			#
+			# Report a Note to the database.  Notes can be tied to a Workspace, Host, or Service.
+			#
+			# opts MUST contain
+			# +:data+::  whatever it is you're making a note of
+			# +:type+::  The type of note, e.g. smb_peer_os
+			#
+			# opts can contain
+			# +:workspace+::  the workspace to associate with this Note
+			# +:host+::       an IP address or a Host object to associate with this Note
+			# +:service+::    a Service object to associate with this Note
+			# +:port+::       along with :host and proto, a service to associate with this Note
+			# +:proto+::      along with :host and port, a service to associate with this Note
+			# +:update+::     what to do in case a similar Note exists, see below
+			#
+			# The +:update+ option can have the following values:
+			# +:unique+::       allow only a single Note per +:host+/+:type+ pair
+			# +:unique_data+::  like +:uniqe+, but also compare +:data+
+			# +:insert+::       always insert a new Note even if one with identical values exists
+			#
+			# If the provided +:host+ is an IP address and does not exist in the
+			# database, it will be created.  If +:workspace+, +:host+ and +:service+
+			# are all omitted, the new Note will be associated with the current
+			# workspace.
+			#
 		end # make_note
 		
 		#
@@ -408,6 +407,7 @@ class Plugin::DbFun < Msf::Plugin
 			return true if (val.nil? or val =~ /^\s$/ or val.empty? or val.downcase == "nil")
 			false
 		end
+		
 		#
 		# Actually creates a db set
 		#
@@ -489,10 +489,10 @@ class Plugin::DbFun < Msf::Plugin
 						#		:port => "optional" along w/ :host & proto, a service to assoc w/ this Note
 						#		:proto => "optional" along w/ :host & port, a service to assoc w/ this Note
 						#		:update => what to do in case a similar Note exists
-								# The +:update+ option can have the following values:
-								#unique+::allow only a single Note per +:host+/+:type+ pair
-								#:unique_data+::like +:uniqe+, but also compare +:data+
-								#:insert+::always insert a new Note regardless
+						#		 The +:update+ option can have the following values:
+						#		unique+::allow only a single Note per +:host+/+:type+ pair
+						#		:unique_data+::like +:uniqe+, but also compare +:data+
+						#		:insert+::always insert a new Note regardless
 						#				})
 
 
@@ -538,7 +538,7 @@ class Plugin::DbFun < Msf::Plugin
 		def run_post(inst, args={}, opts={})
 			# TODO:  Do we need validation of args this far down in the call stack?
 			
-			# run against any sessions matching our set (service or host) or a sessions set?
+				# run against any sessions matching our set (service or host) or a sessions set?
 			# TODO:  support hosts and services, but convert them to any live sessions
 			# for now, the set must be of type Session
 			
@@ -673,7 +673,7 @@ class Plugin::DbFun < Msf::Plugin
 			print_deb ("Class name:  #{class_name}")
 			 
 			begin
-				eval("Msf::DBManager::#{class_name}.respond_to?(:find)")
+				eval("framework.db.#{class_name}.respond_to?(:find)")
 			rescue
 				print_error "Error while querying database. Make sure this table"
 				print_error "and column combination actually exists in the database."
@@ -681,7 +681,7 @@ class Plugin::DbFun < Msf::Plugin
 			end
 			
 			if args.count == 1
-				@working_set = eval("Msf::DBManager::#{class_name}.all")
+				@working_set = eval("framework.db.#{class_name}.all")
 		  	else
 				filters = []
 				sub_items_list = []
@@ -710,7 +710,7 @@ class Plugin::DbFun < Msf::Plugin
 				end
 
 				# Go get the items
-				query_string = "Msf::DBManager::#{class_name}.all"
+				query_string = "framework.db.#{class_name}.all"
 				item_set = eval(query_string)
 				
 				### 
@@ -903,14 +903,14 @@ class Plugin::DbFun < Msf::Plugin
 				end
 
 				## generate all possible columns
-				if eval("Msf::DBManager::#{class_name}.respond_to?('columns')")
-	 				eval("Msf::DBManager::#{class_name}.columns.each do |type_col|
+				if eval("framework.db.#{class_name}.respond_to?('columns')")
+	 				eval("framework.db.#{class_name}.columns.each do |type_col|
 	 						all_possible_columns << type_col.name
 	 					end")
 	 			end
 	 			if all_possible_columns.empty?
 	 				print_error("The database does not recognize #{class_name} objects")
-	 				print_deb("Msf::DBManager didn't respond_to? #{class_name}.columns")
+	 				print_deb("DBManager didn't respond_to? #{class_name}.columns")
 	 				return []
 	 			end		
 
