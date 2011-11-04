@@ -8,6 +8,21 @@ class Plugin::DbFun < Msf::Plugin
 	class DbFunCommandDispatcher
 		include Msf::Ui::Console::CommandDispatcher
 		
+		#TODO:  Turn a db_set into it's own class
+		class DbFunSet < Array
+			attr_accessor :id,:records
+			def initialize(id,records=[])
+				@id = id
+				@records = records
+			end
+			
+			def self.valid_set_id?(id)
+				true
+				# see if any objects of type DbFunSet have matching id
+			end
+		end
+		# ^^^^ the stuff above isn't utilized yet, just musing here
+		
 		def initialize(driver)
 			super(driver)
 			@working_set = []
@@ -18,6 +33,14 @@ class Plugin::DbFun < Msf::Plugin
 		end
 		
 		attr_accessor :debug
+		
+		# add some needed methods to some Msf::DBManager classes
+		# TODO:  switch this to use some reflection
+		# like: ["Host","Service"].each {|x| class_eval("Msf::DBManager::#{x}") etc}
+		#class Msf::DBManager::Host
+		#	attr_reader :db_fun_type
+		#	@db_fun_type= self.class.split(":").last.downcase
+		# end
 		
 		def print_deb(msg='')
 			print_line("%bld%mag[debug]%clr #{msg}") if @debug
@@ -40,7 +63,7 @@ class Plugin::DbFun < Msf::Plugin
 			"db_set_run_module"	=> "[id] module [payload] [OPT=val] # run module against set",
 			"db_fun_show_examples"	=> "I'm confused, show me some examples",
 			"db_fun_debug" 	=> "[true|false] # sets or displays debug setting",
-			"db_fun_note" 	=> "\"my note\" [id] # create note on a host or set id",
+			"db_fun_note" 	=> "[id] \"my note\" # create note on current workspace, or a set",
 		}
 		end
 
@@ -78,9 +101,10 @@ class Plugin::DbFun < Msf::Plugin
 			"db_set_create" => "db_set_create 1  # creates db set with id 1 using latest query",
 			"db_set_add_to" =>  "db_set_add_to 1  # adds to db set 1 using latest query results",
 			"db_set_run_module" => "db_set_run_module windows scanner/smb/smb_version # run mod against set 'windows'",
+			"db_fun_note" => "db_fun_note servers 'Acting as servers' # Add note to 'servers' set"
 			}
 			#just do a simple display for now
-			print_good "db_fun command examples"
+			print_status "db_fun command examples"
 			examples.each_value do |val|
 				print_line("   #{val}")
 			end
@@ -98,7 +122,7 @@ class Plugin::DbFun < Msf::Plugin
 				hlp_print_set @working_set, "Working Set" 
 			else
 				set_id = args[0]
-				if @sets.include?(set_id)
+				if is_valid_set?(set_id)
 					hlp_print_set @sets[set_id], "Set #{set_id}"
 				else
 					print_error "The provided set (#{set_id}) was not found in:"
@@ -123,9 +147,9 @@ class Plugin::DbFun < Msf::Plugin
 				@debug = false
 			elsif bool =~ /^t/i
 				@debug = true
-				print_good "Debugging information will now be displayed"
+				print_status "Debugging information will now be displayed"
 			elsif bool.nil?
-				print_good "Debug is set to #{@debug.to_s}"
+				print_status "Debug is set to #{@debug.to_s}"
 			else
 				print_error "I didn't recognize your argument, try true, false, or no arguments"
 			end
@@ -140,8 +164,8 @@ class Plugin::DbFun < Msf::Plugin
 				mod_args = {}
 				mod_opts = {}
 				mod_args[:set] = @working_set # default
-				if @sets.has_key?(args[0])
-					# if the first arg seems to be a key in @sets, assume it's a set_id and resolve it
+				if is_valid_set?(args[0])
+				# if the first arg seems to be a key in @sets, assume it's a set_id and resolve it
 					print_deb "#{args[0]} looks like a set id"
 					begin
 						mod_args[:set] = @sets[args[0]] 
@@ -204,6 +228,7 @@ class Plugin::DbFun < Msf::Plugin
 		# Automatically create some default sets such as windows, linux, all_hosts, all_services etc
 		def cmd_db_set_auto
 			#TODO:  Find a way to persist sets by serializing? them to .msf4 etc
+			#TODO:  Let the user add or subtract from this
 			self.create_set("windows", "hosts where os_name~windows")
 			self.create_set("linux", "hosts where os_name~linux")
 			self.create_set("all_hosts", "hosts")
@@ -217,7 +242,11 @@ class Plugin::DbFun < Msf::Plugin
 			return fun_usage unless args.count > 0
 			
 			set_id = args[0]
-			@sets[set_id].merge!(@working_set)
+			if is_valid_set?(set_id)
+				@sets[set_id].merge!(@working_set)
+			else
+				print_error "#{set_id} is not a valid set id"
+			end
 		end
 
 		# This method just loops through our named set, and each
@@ -225,12 +254,16 @@ class Plugin::DbFun < Msf::Plugin
 		# the same.
 		def cmd_db_set_del_from(*args)
 			set_id = args[0]
-			@sets[set_id].each do |item|
-				@working_set.each do |working_item|
-					if @working_item == item
-						@sets[set_id].remove!(item)
+			if is_valid_set?(set_id)
+				@sets[set_id].each do |item|
+					@working_set.each do |working_item|
+						if @working_item == item
+							@sets[set_id].remove!(item)
+						end
 					end
 				end
+			else
+				print_error "#{set_id} is not a valid set id"
 			end
 		end
 		
@@ -238,6 +271,7 @@ class Plugin::DbFun < Msf::Plugin
 		# Adds a simple note or notes to a db entry or db_fun set
 		#
 		def cmd_db_fun_note(*args)
+			# this should currently support mixed sets, unlike the rest of the code
 
 			# the required hash elements for a good note:
 			# required_elements = [ :data, :type]
@@ -249,7 +283,7 @@ class Plugin::DbFun < Msf::Plugin
 						:workspace => nil, # if none of above given, current workspace  assumed
 						:port => nil,
 						:proto => nil,
-						:update => :unique, # allow only a single Note per +:host+/+:type+ pair
+						:update => :unique_data,
 						:seen => nil,
 						:critical => nil,
 						}
@@ -271,23 +305,25 @@ class Plugin::DbFun < Msf::Plugin
 			case args.length
 			when 1
 				note_hash[:data] = args[0]
-				id = nil
 				# assume it's a super simple note for the workspace and default everything else
 				self.make_note(note_hash)
 			when 2
-				note_hash[:data] = args[0]
-				id = args[1]
-				# TODO: figure out what kind of id they are using
-				# if id is host id, just set :host => id
+				id = args[0]
+				note_hash[:data] = args[1]
+				# TODO: maybe support host & service ids too? if host_is set :host => id
 				
-				# if the first arg seems to be a key in @sets, assume it's a set_id
-				if @sets.has_key?(id)
-					# loop over objects in set & make note for each :host => obj[host]
-				end
-					
-				# hsh.merge(other_hash) # other_hash wins conflicts by default
-				
-				self.make_note(note_hash)
+				# if the first arg seems to be a set_id...
+				if is_valid_set?(id)
+					# loop over objects in set & make note for each
+					print_status "Adding note to objects in set:  #{id}"
+					retrieve_set(id).each do |obj|
+						obj_type_sym = get_type(obj).downcase.to_sym
+						note_hash[obj_type_sym] = obj
+						self.make_note(note_hash)
+					end
+				else
+					print_error "Could not find a valid set named #{id}"					
+				end				
 			else
 				return fun_usage
 			end
@@ -296,18 +332,44 @@ class Plugin::DbFun < Msf::Plugin
 		protected
 		
 		#
-		# Actually adds a note to the db, basically validate & proxy to Msf::DBManager::report_note
+		# Determines is a given id is a valid set id
 		#
-		# expects a hash
-		def make_note (note_hash, framework=self.framework)
-			print_deb "Attempting to create note with #{note_hash.inspect}"
-			# the required hash elements for a good note
-			required_elements = [:data,:type]
+		def is_valid_set?(id)
+			return true if id =~ /working/i and @working_set
+			return true if @sets.include?(id)
+			false
+		end
+		
+		#
+		# This method returns the set matching a supplied set id, and
+		# handles a set id, but the "working set id"
+		#
+		def retrieve_set(id)
+			raise RuntimeError.new "Invalid set id" unless is_valid_set?(id)
+			return @working_set if id =~ /working/i
+			return @sets[id]
+		end
+		
+		#
+		# Actually adds a note to the db, basically validate & proxy
+		#  to Msf::DBManager::report_note.  Expects a hash
+		#
+		def make_note (notes_hash, framework=self.framework)
+			print_deb "Attempting to create note with #{notes_hash.inspect}"
+			# check the required hash elements for a good note
+			
+			# <-- start weird bug work around
+			required_elements = [:data]
+			#required_elements = [:data,:type]
+			notes_hash[:type] = "db_fun"
+			# --> end weird bug work around
+			
 			required_elements.each do |elem|
 				raise ArgumentError.new "Missing required element (#{elem}) " +
-				"for the note" unless note_hash[elem]
+				"for the note" unless notes_hash[elem]
 			end
-			framework.db.report_note(note_hash)
+			print_deb "Sending note to db with #{notes_hash.inspect}"
+			framework.db.report_note(notes_hash)
 				
 	#
 	# Report a Note to the database.  Notes can be tied to a Workspace, Host, or Service.
@@ -360,7 +422,7 @@ class Plugin::DbFun < Msf::Plugin
 		#
 		def normalize_module(m)
 			raise ArgumentError.new "Could not normalize module, no module given" unless m
-			# TODO:  Improve this ghetto crap
+			# TODO:  Improve this ghetto crap, framework probably handles this better somehow
 			# remove any leading slashes and any leading words like auxiliary or post etc
 			modjool = m.downcase
 			modjool.gsub!(/^[\\\/]+/,'') # this is supposed to get rid of leading slashes
@@ -441,7 +503,7 @@ class Plugin::DbFun < Msf::Plugin
 			if args[:set].count > 0
 				args[:set].each do |item| 
 					if item.class == Msf::DBManager::Host
-						print_good "Running #{inst.name} against #{item.address}"
+						print_status "Running #{inst.name} against #{item.address}"
 						#`
 						# Do it like a boss d-_-b
 						#
@@ -483,7 +545,7 @@ class Plugin::DbFun < Msf::Plugin
 			if args[:set].count > 0
 				args[:set].each do |item| 
 					if item.class == Msf::DBManager::Session
-						print_good "Running #{inst.name} against session #{item.local_id}" #TODO:  host,address,id?
+						print_status "Running #{inst.name} against session #{item.local_id}" #TODO:  host,address,id?
 						#`
 						# Do it like a boss d-_-b
 						#
@@ -568,7 +630,7 @@ class Plugin::DbFun < Msf::Plugin
 			if args[:set].count > 0
 				args[:set].each do |item| 
 					if item.class == Msf::DBManager::Host # TODO this could be service too maybe?
-						print_good "Running #{inst.name} against #{item.address}"
+						print_status "Running #{inst.name} against #{item.address}"
 						#
 						# Do it like a boss d-_-b
 						#
@@ -674,16 +736,16 @@ class Plugin::DbFun < Msf::Plugin
 					end	
 				end	
 
-				print_good "Searching for #{class_name} with conditions..."
+				print_status "Searching for #{class_name} with conditions..."
 
 				# Tell the user what their filter looks like
 				equal_conditions.each_pair do |key,val|
-					print_good "Exact: #{key} = #{val}"
+					print_status "Exact: #{key} = #{val}"
 				end
 
 				# Tell the user what their filter looks like
 				match_conditions.each_pair do |key,val|
-					print_good "Match: #{key} =~ /#{val}/"
+					print_status "Match: #{key} =~ /#{val}/"
 				end
 				
 				### 
@@ -769,12 +831,12 @@ class Plugin::DbFun < Msf::Plugin
 			
 			if @working_set
 				class_name = get_type(@working_set.first)
-				print_line "[Working Set]: #{@working_set.count} items of type #{class_name}"
+				print_line("%bld%dyel[Working Set]:%clr\t#{@working_set.count} items of type #{class_name}")
 			end
 			
 			@sets.each do |name,value| 
 				class_name = get_type(value.first)
-				print_line "[#{name}]: #{value.count} items of type #{class_name}"
+				print_line("%bld%dyel[#{name}]:%clr\t#{value.count} items of type #{class_name}")
 			end	
 		end
 		
