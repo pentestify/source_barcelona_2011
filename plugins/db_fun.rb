@@ -8,28 +8,25 @@ class Plugin::DbFun < Msf::Plugin
 	class DbFunCommandDispatcher
 		include Msf::Ui::Console::CommandDispatcher
 		
-		#TODO:  Turn a db_set into it's own class
-		class DbFunSet < Array
-			attr_accessor :id,:records
-			def initialize(id,records=[])
-				@id = id
-				@records = records
-			end
-			
-			def self.valid_set_id?(id)
-				true
-				# see if any objects of type DbFunSet have matching id
-			end
-		end
-		# ^^^^ the stuff above isn't utilized yet, just musing here
-		
 		def initialize(driver)
 			super(driver)
 			@working_set = []
 			@sets = {}
-			@debug = true
+			@debug = false
 			@output = driver.output
 			@input = driver.input
+			@note_template = 
+						{
+						:type => "db_fun",
+						:host => nil,
+						:service => nil,
+						:workspace => nil, # if none of above get specified, current workspace assumed
+						:port => nil,
+						:proto => nil,
+						:update => :unique_data,
+						:seen => nil,
+						:critical => nil,
+						}
 		end
 		
 		attr_accessor :debug
@@ -42,11 +39,12 @@ class Plugin::DbFun < Msf::Plugin
 		#	@db_fun_type= self.class.split(":").last.downcase
 		# end
 		
+		#
+		# Our only little conditional debug message printer
+		#
 		def print_deb(msg='')
 			print_line("%bld%mag[debug]%clr #{msg}") if @debug
 		end
-
-		# TODO:  Turn a set into it's own class?  I guess it already has a class from DbManager?
 
 		#
 		# Returns the hash of commands supported by this dispatcher.
@@ -64,6 +62,7 @@ class Plugin::DbFun < Msf::Plugin
 			"db_fun_show_examples"	=> "I'm confused, show me some examples",
 			"db_fun_debug" 	=> "[true|false] # sets or displays debug setting",
 			"db_fun_note" 	=> "[id] \"my note\" # create note on current workspace, or a set",
+			"db_fun_tag"	=> "[id] tag1 [tag2 .. tagx] # create tags on current workspace or a set",
 		}
 		end
 
@@ -94,19 +93,22 @@ class Plugin::DbFun < Msf::Plugin
         
 		def cmd_db_fun_show_examples()
 			examples = {
-			:db_search => [ "db_search hosts where os_name~windo",
-							"db_search hosts where os_name=linux",
-							"db_search services where proto=tcp",
-							"db_search sessions where closed_at=nil" ],
-			"db_set_create" => "db_set_create 1  # creates db set with id 1 using latest query",
-			"db_set_add_to" =>  "db_set_add_to 1  # adds to db set 1 using latest query results",
-			"db_set_run_module" => "db_set_run_module windows scanner/smb/smb_version # run mod against set 'windows'",
-			"db_fun_note" => "db_fun_note servers 'Acting as servers' # Add note to 'servers' set"
+			:db_search 	=> ["hosts where os_name~windo",
+							"hosts where os_name=linux",
+							"services where proto=tcp",
+							"sessions where closed_at=nil",
+							"hosts where notes contains ntype=db_fun"
+							],
+			:db_set_create => "1  # creates db set with id 1 using latest query",
+			:db_set_add_to => "1  # adds to db set 1 using latest query results",
+			:db_set_run_module => "windows scanner/smb/smb_version # run mod against set 'windows'",
+			:db_fun_note 	=> "servers 'Acting as servers' # Add note to 'servers' set",
+			:db_fun_tag		=> "working exploited 'admin access' contaminated #add tags to working set",
 			}
-			#just do a simple display for now
+			#just do a simple display for now TODO:  make the display sexier
 			print_status "db_fun command examples"
-			examples.each_value do |val|
-				print_line("   #{val}")
+			examples.each do |key,val|
+				print_line("#{key.to_s} #{val.to_s}")
 			end
 		end
 
@@ -132,8 +134,10 @@ class Plugin::DbFun < Msf::Plugin
 		end	
 
 		def cmd_db_search(*args)
+			# TODO:  needs work to support more complex searching like
+			# TODO:  db_search hosts where notes contains ntype=db_fun and data~:tags
+			# TODO:  notes might be a string, array, or hash
 			return fun_usage unless args.count > 0
-			#TODO:  Add support for searching for an empty or nil column value
 			result_set = self.dbsearch(args)
 			if result_set.length > 0
 				hlp_print_set(result_set, "Searched Set")
@@ -268,7 +272,7 @@ class Plugin::DbFun < Msf::Plugin
 		end
 		
 		#
-		# Adds a simple note or notes to a db entry or db_fun set
+		# Adds a simple note or notes to a db_fun set or the workspace
 		#
 		def cmd_db_fun_note(*args)
 			# this should currently support mixed sets, unlike the rest of the code
@@ -276,17 +280,7 @@ class Plugin::DbFun < Msf::Plugin
 			# the required hash elements for a good note:
 			# required_elements = [ :data, :type]
 			# note hash that we ultimately send to make_note, with default values
-			note_hash = {
-						:type => "db_fun",
-						:host => nil,
-						:service => nil,
-						:workspace => nil, # if none of above given, current workspace  assumed
-						:port => nil,
-						:proto => nil,
-						:update => :unique_data,
-						:seen => nil,
-						:critical => nil,
-						}
+			note_hash = @note_template.dup
 
 			# Check if the database is active, otherwise crap out
 			fmwk = self.framework
@@ -326,6 +320,71 @@ class Plugin::DbFun < Msf::Plugin
 				end				
 			else
 				return fun_usage
+			end
+		end
+		
+		#
+		# Adds a list of tags to a db_fun set or the current workspace
+		#
+		def cmd_db_fun_tag(*args)
+			# TODO:  This needs work, once db_search suports complex searching like:
+			# TODO:  db_search hosts where notes contains ntype=db_fun and data~:tags
+		
+			unless args.count > 0
+				print_error "No point in tagging nothing with nothing"
+				return fun_usage
+			end
+			# tags should separated by spaces like normal args (for now)
+			# like db_fun_tag [id] tag1 tag2 tag3 "compound tag"
+			# this should currently support mixed sets, unlike the rest of the code
+
+			# the required hash elements for a good note:
+			# required_elements = [ :data, :type]
+			# note hash that we ultimately send to make_note, with default values
+			note_hash = @note_template.dup
+			# override some of the defaults
+			note_hash = {
+						:update => :insert, #hrmmmm
+						:data => { :tags => [] }
+						}
+
+			# Check if the database is active, otherwise crap out
+			fmwk = self.framework
+			if fmwk.db and fmwk.db.active
+				begin
+					note_hash[:workspace] = fmwk.db.workspace unless note_hash[:workspace]
+				rescue Exception => e
+					print_error "Unable to determine active workspace, reason:  #{e.to_s}"
+				end
+			else
+				#do we just let them know, or raise an error... hrm for now:
+				raise  RuntimeError.new "Database is not active"
+			end
+
+			# Lookin' good, let's populate the note hash with user supplied info
+			# we can't really rely on the number of args here, so we test the first arg
+			# to see if it is a valid set_id, however this could lead to confusion when
+			# the first tag is exactly the same as a valid set_id...
+			maybe_id = args[0]
+			if is_valid_set?(maybe_id)
+				print_deb "Tag args are:  #{args.to_s}"
+				# then we assume maybe_id is actually an id
+				id = maybe_id
+				args.shift
+				note_hash[:data][:tags] = args.uniq
+				# TODO: maybe support host & service ids too? if host_is set :host => id
+				
+				# now loop over objects in set & make note on each
+				print_status "Adding tags to objects in set:  #{id}"
+				retrieve_set(id).each do |obj|
+					obj_type_sym = get_type(obj).downcase.to_sym
+					note_hash[obj_type_sym] = obj
+					self.make_note(note_hash)
+				end
+			else
+				# otherwise we have to assume you are trying to tag the workspace, which is eh...
+				note_hash[:data][:tags] = args.uniq
+				self.make_note(note_hash)
 			end
 		end
 		
@@ -831,12 +890,16 @@ class Plugin::DbFun < Msf::Plugin
 			
 			if @working_set
 				class_name = get_type(@working_set.first)
-				print_line("%bld%dyel[Working Set]:%clr\t#{@working_set.count} items of type #{class_name}")
+				msg = "%bld%dyel[Working Set]:%clr\t#{@working_set.count} items"
+				msg += " of type #{class_name}" unless @working_set.count < 1
+				print_line msg
 			end
 			
 			@sets.each do |name,value| 
 				class_name = get_type(value.first)
-				print_line("%bld%dyel[#{name}]:%clr\t#{value.count} items of type #{class_name}")
+				msg = "%bld%dyel[#{name}]:%clr\t#{value.count} items"
+				msg += " of type #{class_name}" unless value.count < 1
+				print_line msg
 			end	
 		end
 		
