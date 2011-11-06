@@ -60,14 +60,9 @@ class Plugin::DbFun < Msf::Plugin
 			"db_set_del_from"	=> "[id] - Delete these items from the working set",	
 			"db_set_run_module"	=> "[id] module [payload] [OPT=val] # run module against set",
 			"db_fun_show_examples"	=> "I'm confused, show me some examples",
-<<<<<<< HEAD:plugins/db_fun/db_fun.rb
 			"db_fun_debug" 	=> "[true|false] # sets or displays debug setting",
 			"db_fun_note" 	=> "[id] \"my note\" # create note on current workspace, or a set",
 			"db_fun_tag"	=> "[id] tag1 [tag2 .. tagx] # create tags on current workspace or a set",
-=======
-			"db_fun_debug" 		=> "[true|false] # sets or displays debug setting",
-			"db_fun_note" 		=> "[id] \"my note\" # create note on current workspace, or a set",
->>>>>>> 3a9107e25540e1584582a8b8112e633572108e85:plugins/db_fun.rb
 		}
 		end
 
@@ -98,7 +93,6 @@ class Plugin::DbFun < Msf::Plugin
         
 		def cmd_db_fun_show_examples()
 			examples = {
-<<<<<<< HEAD:plugins/db_fun/db_fun.rb
 			:db_search 	=> ["hosts where os_name~windo",
 							"hosts where os_name=linux",
 							"services where proto=tcp",
@@ -110,17 +104,7 @@ class Plugin::DbFun < Msf::Plugin
 			:db_set_run_module => "windows scanner/smb/smb_version # run mod against set 'windows'",
 			:db_fun_note 	=> "servers 'Acting as servers' # Add note to 'servers' set",
 			:db_fun_tag		=> "working exploited 'admin access' contaminated #add tags to working set",
-=======
-			:db_search => [ 		"db_search hosts where os_name~windo",
-							"db_search hosts where os_name=linux",
-							"db_search services where proto=tcp",
-							"db_search sessions where closed_at=nil" ],
-							"db_set_create" => "db_set_create 1  # creates db set with id 1 using latest query",
-							"db_set_add_to" =>  "db_set_add_to 1  # adds to db set 1 using latest query results",
-							"db_set_run_module" => "db_set_run_module windows scanner/smb/smb_version # run mod against set 'windows'",
-							"db_fun_note" => "db_fun_note servers 'Acting as servers' # Add note to 'servers' set"
->>>>>>> 3a9107e25540e1584582a8b8112e633572108e85:plugins/db_fun.rb
-			}
+						}
 			#just do a simple display for now TODO:  make the display sexier
 			print_status "db_fun command examples"
 			examples.each do |key,val|
@@ -748,15 +732,16 @@ class Plugin::DbFun < Msf::Plugin
 			print_deb ("Class name:  #{class_name}")
 			 
 			begin
-				eval("framework.db.#{class_name}.respond_to?(:find)")
-			rescue
-				print_error "Error while querying database. Make sure this table"
-				print_error "and column combination actually exists in the database."
+				eval("Msf::DBManager::#{class_name}.respond_to?(:find)")
+			rescue Exception => e
+				#print_error "Error while querying database. Make sure this table"
+				#print_error "and column combination actually exists in the database."
+				print_error e.to_s
 				return
 			end
 			
 			if args.count == 1
-				@working_set = eval("framework.db.#{class_name}.all")
+				@working_set = eval("Msf::DBManager::#{class_name}.all")
 		  	else
 				filters = []
 				sub_items_list = []
@@ -785,7 +770,7 @@ class Plugin::DbFun < Msf::Plugin
 				end
 
 				# Go get the items
-				query_string = "framework.db.#{class_name}.all"
+				query_string = "Msf::DBManager::#{class_name}.all"
 				item_set = eval(query_string)
 				
 				### 
@@ -982,8 +967,8 @@ class Plugin::DbFun < Msf::Plugin
 				end
 
 				## generate all possible columns
-				if eval("framework.db.#{class_name}.respond_to?('columns')")
-	 				eval("framework.db.#{class_name}.columns.each do |type_col|
+				if eval("Msf::DBManager::#{class_name}.respond_to?('columns')")
+	 				eval("Msf::DBManager::#{class_name}.columns.each do |type_col|
 	 						all_possible_columns << type_col.name
 	 					end")
 	 			end
