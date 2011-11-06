@@ -1,0 +1,13 @@
+# rc_delay
+
+# delay
+<ruby>
+	wtime=5
+	print_status "Delaying for #{wtime} seconds"
+	while wtime > 0
+		printf("\r%d",wtime)
+		select(nil, nil, nil, 1)
+		wtime -= 1
+	end
+	print_line
+</ruby>

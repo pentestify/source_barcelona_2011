@@ -1,0 +1,9 @@
+# rc_pause
+
+# pause
+hosts
+<ruby>
+	print_error "PAUSED -- <enter> to continue"
+	gets
+	print_good "Continuing..."
+</ruby>
