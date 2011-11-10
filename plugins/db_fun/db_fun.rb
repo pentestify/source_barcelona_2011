@@ -27,6 +27,7 @@ class Plugin::DbFun < Msf::Plugin
 						:seen => nil,
 						:critical => nil,
 						}
+			@output_file_hack = nil
 		end
 		
 		attr_accessor :debug
@@ -137,7 +138,18 @@ class Plugin::DbFun < Msf::Plugin
 			# TODO:  db_search hosts where notes contains ntype=db_fun and data~:tags
 			# TODO:  notes might be a string, array, or hash
 			return fun_usage unless args.count > 0
-			result_set = self.dbsearch(args)
+			# ghetto hack for outputting to file
+			newargs = []
+			while (arg = args.shift)
+				case arg
+				when '-o', '-O'
+					@output_file_hack = args.shift
+				else 
+					newargs << arg
+				end
+			end
+			# end ghetto hack for outputting to file
+			result_set = self.dbsearch(newargs)
 			if result_set.length > 0
 				hlp_print_set(result_set, "Searched Set")
 			else
@@ -938,7 +950,15 @@ class Plugin::DbFun < Msf::Plugin
 				end
 				tbl << tbl_row
 			end
-			
+			# ghetto hack for outputting to file
+			if @output_file_hack
+				print_status("Wrote hosts to #{@output_file_hack}")
+				::File.open(@output_file_hack, "wb") { |ofd|
+					ofd.write(tbl.to_csv)
+				}
+				@output_file_hack = nil # reset it
+			end
+			# end ghetto hack for outputting to file
 			# print the bastard
 			print_line tbl.to_s
 			print_line "\nAll possible columns: #{all_possible_columns.to_s}"
