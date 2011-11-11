@@ -123,7 +123,18 @@ class Plugin::DbFun < Msf::Plugin
 			if args.count == 0
 				hlp_print_set @working_set, "Working Set" 
 			else
-				set_id = args[0]
+				# ghetto hack for outputting to file
+				newargs = []
+				while (arg = args.shift)
+					case arg
+					when '-o', '-O'
+						@output_file_hack = args.shift
+					else 
+						newargs << arg
+					end
+				end
+				# end ghetto hack for outputting to file
+				set_id = newargs[0]
 				if is_valid_set?(set_id)
 					hlp_print_set @sets[set_id], "Set #{set_id}"
 				else
